@@ -35,6 +35,8 @@ GHOST_CURSOR = True       # True: helper draws a cursor at the dragged point
 GHOST_SCALE = 1.0         # ghost travel per unit of mouse motion
 SNAP_CURSOR_ON_RELEASE = True   # True: warp the anchored cursor to the
                                 # ghost position once the drag ends
+FREE_CURSOR = False       # True: the pointer keeps moving during a drag
+                          # (Windows-style) instead of staying anchored
 
 # Window-class substrings (case-insensitive) over which midscroll pauses
 # and the middle button behaves natively.
@@ -64,6 +66,7 @@ DESKTOP_SHELLS = ["plasmashell", "nemo-desktop", "xfdesktop", "waybar",
 HIRES_PER_LINE = 120      # kernel convention: 120 hi-res units per notch
 MAX_TICK_DT = 0.25        # cap the per-tick time step (see ticker())
 GHOST_HZ = 60.0           # rate of ghost-cursor updates to the helper
+SCREEN_FRESH_S = 0.25     # a session's "screen" offset is trusted this long
 PHYS_MARKER = "midscroll"  # phys string on our mirrors, so we skip our own
 CONFIG_PATH = "/etc/midscroll.conf"
 SOCK_DIR = "/run/midscroll"
@@ -88,7 +91,7 @@ WRITE_DROP_BYTES = 65536   # disconnect a client this far behind
 FLOAT_KEYS = {"DEADZONE_PX", "TICK_HZ", "SPEED_MULT", "SPEED_EXP",
               "MAX_PX_PER_SEC", "PX_PER_NOTCH", "MAX_DRAG_PX", "GHOST_SCALE"}
 BOOL_KEYS = {"NATURAL", "TOGGLE_MODE", "DESKTOP_SCROLL", "GHOST_CURSOR",
-             "SNAP_CURSOR_ON_RELEASE", "ALLOW_KEYBOARDS"}
+             "SNAP_CURSOR_ON_RELEASE", "ALLOW_KEYBOARDS", "FREE_CURSOR"}
 DEVICE_KEYS = {"EXTRA_DEVICES", "IGNORE_DEVICES"}
 # Zero would divide by zero (TICK_HZ, PX_PER_NOTCH) or make the daemon
 # silently never scroll; only the dead zone may be zero.
@@ -338,6 +341,8 @@ class Notifier:
         self.server = None
         self.last_pos = None
         self.active_uids = frozenset()
+        self.screen = None      # (dx, dy) on-screen offset from a helper
+        self.screen_t = 0.0
 
     async def start(self):
         try:
@@ -388,12 +393,45 @@ class Notifier:
                 text = line.decode("utf-8", "replace").strip()
                 if text.startswith("focus "):
                     self.focus.update(client, text[len("focus "):])
+                elif text.startswith("screen ") and uid in self.active_uids:
+                    self._screen(text[len("screen "):])
         except (OSError, ConnectionError, ValueError):
             pass  # ValueError: line over SOCK_LIMIT, drop the peer
         finally:
             self.writers.pop(writer, None)
             self.focus.remove(client)
             writer.close()
+
+    def _screen(self, text):
+        """On-screen pointer offset from the press point, reported by a
+        session helper (the GNOME Shell extension) that can see where the
+        pointer really is. Used instead of raw mouse counts so the speed
+        matches the distance drawn on screen despite pointer acceleration."""
+        try:
+            dx, dy = (int(v) for v in text.split())
+        except ValueError:
+            return
+        self.screen = (_clamp(dx), _clamp(dy))
+        self.screen_t = time.monotonic()
+
+    def offset(self, st):
+        """Drag offset to drive speed from: on-screen if fresh, else raw."""
+        if (FREE_CURSOR and self.screen is not None
+                and time.monotonic() - self.screen_t < SCREEN_FRESH_S):
+            return self.screen
+        return st.dx, st.dy
+
+    def event(self, msg):
+        """Press/release of the middle button, to the active session."""
+        self.active_uids = frozenset(
+            u for u in set(self.writers.values()) if _uid_is_active(u))
+        if msg == b"press\n":
+            self.screen = None
+        self._broadcast(msg, active_only=True)
+
+    def speed(self, vx, vy):
+        self._broadcast(b"speed %d %d\n" % (int(vx), int(vy)),
+                        active_only=True)
 
     def _drop(self, writer):
         self.writers.pop(writer, None)
@@ -534,7 +572,9 @@ def speed_px(offset):
     """
     if abs(offset) <= DEADZONE_PX:
         return 0.0
-    v = SPEED_MULT * abs(offset) ** SPEED_EXP
+    # Measured from the dead-zone edge so speed ramps up from zero
+    # instead of jumping (matters for a linear SPEED_EXP = 1).
+    v = SPEED_MULT * (abs(offset) - DEADZONE_PX) ** SPEED_EXP
     return math.copysign(min(v, MAX_PX_PER_SEC), offset)
 
 
@@ -551,21 +591,24 @@ async def ticker(states, notifier, focus):
         last = now
         for st in list(states.values()):
             try:
-                tick(st, dt, focus)
+                tick(st, dt, focus, notifier)
             except Exception as err:  # one bad tick must not kill the loop
                 log.error("tick error: %r", err)
         notifier.set(any(st.scrolling for st in states.values()))
-        if GHOST_CURSOR and now - last_ghost >= 1.0 / GHOST_HZ:
+        if now - last_ghost >= 1.0 / GHOST_HZ:
             last_ghost = now
-            # Only an anchored drag has a ghost: in toggle mode the real
-            # cursor moves, so there is nothing to stand in for it.
             dragging = next((s for s in states.values() if s.active), None)
             if dragging is not None:
-                notifier.pos(dragging.dx * GHOST_SCALE,
-                             dragging.dy * GHOST_SCALE)
+                ox, oy = notifier.offset(dragging)
+                notifier.speed(speed_px(ox), speed_px(oy))
+                # Only an anchored drag has a ghost: with a free cursor or
+                # in toggle mode the real cursor moves, so there is nothing
+                # to stand in for it.
+                if GHOST_CURSOR and not FREE_CURSOR:
+                    notifier.pos(dragging.dx * GHOST_SCALE,
+                                 dragging.dy * GHOST_SCALE)
 
-
-def tick(st, dt, focus):
+def tick(st, dt, focus, notifier):
     if focus.blocked:
         # A blacklisted app is focused. Never scroll, and stop anything
         # already running (focus changed mid-scroll) so it can't keep
@@ -573,8 +616,9 @@ def tick(st, dt, focus):
         if st.scrolling or st.pending:
             st.reset()
         return
+    ox, oy = notifier.offset(st)
     if (not TOGGLE_MODE and st.pending
-            and (abs(st.dx) > DEADZONE_PX or abs(st.dy) > DEADZONE_PX)):
+            and (abs(ox) > DEADZONE_PX or abs(oy) > DEADZONE_PX)):
         st.pending = False
         st.active = True
         log.debug("scroll started")
@@ -585,8 +629,8 @@ def tick(st, dt, focus):
     to_hires = HIRES_PER_LINE / PX_PER_NOTCH
     # Drag down => wheel-down (negative REL_WHEEL); drag right => positive
     # REL_HWHEEL. Both axes at once allows diagonal panning.
-    st.acc_v += s * speed_px(st.dy) * to_hires * dt
-    st.acc_h += -s * speed_px(st.dx) * to_hires * dt
+    st.acc_v += s * speed_px(oy) * to_hires * dt
+    st.acc_h += -s * speed_px(ox) * to_hires * dt
     wrote = False
     iv = int(st.acc_v)
     if iv:
@@ -733,7 +777,7 @@ def _toggle_key(ev, st, ui, focus):
     return False  # other buttons while idle pass straight through
 
 
-async def pump(path, dev, states, tasks, focus, our_paths):
+async def pump(path, dev, states, tasks, focus, our_paths, notifier):
     """Grab one mouse and forward its events, intercepting middle-drags."""
     # Belt to is_mouse's phys check and main's our_paths skip: never pump one
     # of our own mirrors. Guards the brief hotplug window between a mirror
@@ -781,13 +825,15 @@ async def pump(path, dev, states, tasks, focus, our_paths):
                         ui.write(e.EV_KEY, e.BTN_MIDDLE, 1)
                     else:
                         st.press()
+                        notifier.event(b"press\n")
                 elif ev.value == 0:
                     if st.passthrough:
                         st.passthrough = False
                         ui.write(e.EV_KEY, e.BTN_MIDDLE, 0)
                     else:
                         was_click, dx, dy = st.release()
-                        if SNAP_CURSOR_ON_RELEASE:
+                        notifier.event(b"release\n")
+                        if SNAP_CURSOR_ON_RELEASE and not FREE_CURSOR:
                             # Catch the anchored cursor up to wherever the real
                             # mouse ended up, like Windows does.
                             sx, sy = int(dx), int(dy)
@@ -806,6 +852,12 @@ async def pump(path, dev, states, tasks, focus, our_paths):
                     # Toggle mode: track distance from the origin but let the
                     # motion through, so the cursor follows the hand like
                     # Windows autoscroll.
+                    _accumulate(st, ev)
+                    ui.write(ev.type, ev.code, ev.value)
+                    continue
+                if (st.pending or st.active) and FREE_CURSOR:
+                    # Hold-drag, Windows-style: the pointer keeps moving and
+                    # the offset from the press point sets the speed.
                     _accumulate(st, ev)
                     ui.write(ev.type, ev.code, ev.value)
                     continue
@@ -1040,7 +1092,7 @@ async def main():
                     dev.close()
                     continue
                 tasks[path] = asyncio.create_task(
-                    pump(path, dev, states, tasks, focus, our_paths))
+                    pump(path, dev, states, tasks, focus, our_paths, notifier))
             await asyncio.sleep(2)
     finally:
         tick_task.cancel()

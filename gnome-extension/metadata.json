@@ -1,0 +1,7 @@
+{
+  "uuid": "midscroll-indicator@midscroll",
+  "name": "midscroll indicator",
+  "description": "Draws the middle-drag autoscroll anchor and a live speed gauge for the midscroll daemon, and reports the on-screen drag distance back to it.",
+  "shell-version": ["45", "46", "47", "48"],
+  "version": 1
+}
