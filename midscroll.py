@@ -37,6 +37,8 @@ SNAP_CURSOR_ON_RELEASE = True   # True: warp the anchored cursor to the
                                 # ghost position once the drag ends
 FREE_CURSOR = False       # True: the pointer keeps moving during a drag
                           # (Windows-style) instead of staying anchored
+LOCK_WINDOW = True        # with FREE_CURSOR: keep scrolling the window the
+                          # drag started in even after the pointer leaves it
 
 # Window-class substrings (case-insensitive) over which midscroll pauses
 # and the middle button behaves natively.
@@ -67,6 +69,12 @@ HIRES_PER_LINE = 120      # kernel convention: 120 hi-res units per notch
 MAX_TICK_DT = 0.25        # cap the per-tick time step (see ticker())
 GHOST_HZ = 60.0           # rate of ghost-cursor updates to the helper
 SCREEN_FRESH_S = 0.25     # a session's "screen" offset is trusted this long
+# Held on the mirror for the length of a free-cursor drag. While any button
+# is down, Wayland compositors (and X11) keep pointer focus on the surface
+# it went down on (the implicit grab), so wheel events keep reaching the
+# window the drag started in. BTN_TASK because apps ignore it, unlike
+# BTN_SIDE/EXTRA/FORWARD/BACK, which browsers treat as back/forward.
+LOCK_BUTTON = e.BTN_TASK
 PHYS_MARKER = "midscroll"  # phys string on our mirrors, so we skip our own
 CONFIG_PATH = "/etc/midscroll.conf"
 SOCK_DIR = "/run/midscroll"
@@ -91,7 +99,8 @@ WRITE_DROP_BYTES = 65536   # disconnect a client this far behind
 FLOAT_KEYS = {"DEADZONE_PX", "TICK_HZ", "SPEED_MULT", "SPEED_EXP",
               "MAX_PX_PER_SEC", "PX_PER_NOTCH", "MAX_DRAG_PX", "GHOST_SCALE"}
 BOOL_KEYS = {"NATURAL", "TOGGLE_MODE", "DESKTOP_SCROLL", "GHOST_CURSOR",
-             "SNAP_CURSOR_ON_RELEASE", "ALLOW_KEYBOARDS", "FREE_CURSOR"}
+             "SNAP_CURSOR_ON_RELEASE", "ALLOW_KEYBOARDS", "FREE_CURSOR",
+             "LOCK_WINDOW"}
 DEVICE_KEYS = {"EXTRA_DEVICES", "IGNORE_DEVICES"}
 # Zero would divide by zero (TICK_HZ, PX_PER_NOTCH) or make the daemon
 # silently never scroll; only the dead zone may be zero.
@@ -492,9 +501,22 @@ class State:
 
     def __init__(self, ui):
         self.ui = ui
+        self.locked = False       # LOCK_BUTTON held down on the mirror
         self.reset()
 
+    def lock(self):
+        if not self.locked:
+            self.locked = True
+            self.ui.write(e.EV_KEY, LOCK_BUTTON, 1)
+            self.ui.syn()
+
     def reset(self):
+        # Every way a drag ends comes through here, so this is the one
+        # place the lock button is let go.
+        if self.locked:
+            self.locked = False
+            self.ui.write(e.EV_KEY, LOCK_BUTTON, 0)
+            self.ui.syn()
         self.pending = False      # middle held, deadzone not yet exceeded
         self.active = False       # hold-drag scrolling
         self.toggled = False      # toggle-mode scrolling (no button held)
@@ -621,6 +643,8 @@ def tick(st, dt, focus, notifier):
             and (abs(ox) > DEADZONE_PX or abs(oy) > DEADZONE_PX)):
         st.pending = False
         st.active = True
+        if FREE_CURSOR and LOCK_WINDOW:
+            st.lock()
         log.debug("scroll started")
     if not st.scrolling:
         return
