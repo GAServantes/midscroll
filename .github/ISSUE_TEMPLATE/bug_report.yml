@@ -1,0 +1,44 @@
+name: Bug report
+description: Something doesn't work the way it should
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: midscroll version
+      description: "`midscroll --version`"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Distribution and version
+      placeholder: Ubuntu 24.04
+    validations:
+      required: true
+  - type: input
+    id: desktop
+    attributes:
+      label: Desktop and session
+      description: "Your desktop and its version, and Wayland or X11 (`echo $XDG_SESSION_TYPE`)."
+      placeholder: GNOME 46, Wayland
+    validations:
+      required: true
+  - type: input
+    id: mouse
+    attributes:
+      label: Mouse
+      description: "Its name, from `sudo midscroll --list-devices`."
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: "Output of `journalctl -u midscroll -b --no-pager | tail -50` (and on GNOME, `journalctl --user -b | grep -i midscroll | tail -20`)."
+      render: text
