@@ -13,6 +13,11 @@ Windows-style middle-button drag autoscroll for Linux.
 > The GNOME work is also offered upstream as
 > [gnhen/midscroll#17](https://github.com/gnhen/midscroll/pull/17).
 
+![Hold the middle button and drag: the page scrolls faster the farther you go, with the anchor, a speed bar and a px/s readout drawn by the GNOME extension](screenshots/gnome-demo.gif)
+
+<sub>Recorded in GNOME Shell 50. The bar turns from green to red as you drag
+farther; drag back past the anchor to scroll the other way.</sub>
+
 Hold the middle mouse button and drag. The page scrolls in that direction,
 faster the farther you drag from where you pressed, like Windows 10/11.
 Release to stop. A quick middle click without dragging still works as a
