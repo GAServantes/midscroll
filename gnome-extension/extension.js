@@ -37,6 +37,9 @@ const BAR_WIDTH = 6;
 const ANCHOR_SIZE = 30;
 // Fraction of the screen's height at which the bar turns fully red.
 const RED_AT_FRACTION = 0.5;
+// The finest scroll step that reaches apps unchanged: Mutter divides a
+// continuous scroll by 10 and sends it as wl_fixed (1/256) times 10.
+const SCROLL_STEP = 10 / 256;
 // Until the daemon's "cfg" line arrives: its built-in defaults.
 const DEFAULT_CFG = {
     deadzone: 0, mult: 0.008, exp: 2.2, maxSpeed: 30000, maxDrag: 1200,
@@ -171,12 +174,13 @@ export default class MidscrollIndicator extends Extension {
         // Drag down/right scrolls the content down/right, like Windows;
         // NATURAL flips it.
         const s = this._cfg.natural ? -1 : 1;
-        // Mutter's event pipeline carries smooth deltas as doubles, so
-        // sub-pixel steps would go through; whole pixels keep apps that
-        // round each event from losing the remainder.
+        // Send whole SCROLL_STEPs and carry the rest, so every step reaches
+        // the app intact. Apps scale it up (Chromium 12x, GTK3 ~8x, GTK4
+        // ~2.5x): whole pixels made Chromium jump 12 px at a time.
         this._carry[0] += s * vx * dt;
         this._carry[1] += s * vy * dt;
-        const ix = Math.trunc(this._carry[0]), iy = Math.trunc(this._carry[1]);
+        const ix = Math.trunc(this._carry[0] / SCROLL_STEP) * SCROLL_STEP;
+        const iy = Math.trunc(this._carry[1] / SCROLL_STEP) * SCROLL_STEP;
         if (!ix && !iy)
             return;
         this._carry[0] -= ix;

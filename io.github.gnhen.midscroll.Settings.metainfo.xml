@@ -81,6 +81,14 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.19" date="2026-10-20">
+      <description>
+        <p>
+          On GNOME, slow scrolling is now smooth in every app. Chrome, Brave
+          and other Chromium-based apps used to move in 12-pixel jumps.
+        </p>
+      </description>
+    </release>
     <release version="1.18" date="2026-10-20">
       <description>
         <p>

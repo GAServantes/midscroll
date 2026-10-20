@@ -1,5 +1,5 @@
 pkgname=midscroll
-pkgver=1.18
+pkgver=1.19
 pkgrel=1
 pkgdesc="Windows-style middle-button drag autoscroll (kernel-level, works on Wayland and X11)"
 arch=('any')

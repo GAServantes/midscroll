@@ -1,5 +1,5 @@
 Name:           midscroll
-Version:        1.18
+Version:        1.19
 Release:        1%{?dist}
 Summary:        Windows-style middle-button drag autoscroll
 License:        GPL-3.0-or-later
@@ -124,6 +124,9 @@ fi
 %config(noreplace) %{_sysconfdir}/midscroll.conf
 
 %changelog
+* Tue Oct 20 2026 G. Austin Servantes - 1.19-1
+- GNOME: slow scrolling moves in sub-pixel steps instead of whole
+  pixels, which Chromium-based browsers turned into 12 px jumps
 * Tue Oct 20 2026 G. Austin Servantes - 1.18-1
 - GNOME: the Shell extension stays on through the lock screen, so the
   drag anchor and smooth scrolling no longer go missing after an unlock
