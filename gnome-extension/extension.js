@@ -191,9 +191,14 @@ export default class MidscrollIndicator extends Extension {
         this._vbar = new St.Widget({style_class: 'midscroll-bar', reactive: false});
         this._hbar = new St.Widget({style_class: 'midscroll-bar', reactive: false});
         this._badge = new St.BoxLayout({
-            style_class: 'midscroll-anchor', vertical: true, reactive: false,
+            style_class: 'midscroll-anchor', reactive: false,
             x_align: Clutter.ActorAlign.CENTER, y_align: Clutter.ActorAlign.CENTER,
         });
+        // GNOME 48 replaced St.BoxLayout's `vertical` with `orientation`.
+        if ('orientation' in this._badge)
+            this._badge.orientation = Clutter.Orientation.VERTICAL;
+        else
+            this._badge.vertical = true;
         for (const name of ['pan-up-symbolic', 'pan-down-symbolic']) {
             this._badge.add_child(new St.Icon({
                 icon_name: name, icon_size: 12, x_expand: true,

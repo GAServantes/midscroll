@@ -54,9 +54,9 @@
     <binary>midscroll-settings</binary>
   </provides>
 
-  <url type="homepage">https://github.com/gnhen/midscroll</url>
-  <url type="bugtracker">https://github.com/gnhen/midscroll/issues</url>
-  <url type="vcs-browser">https://github.com/gnhen/midscroll</url>
+  <url type="homepage">https://github.com/GAServantes/midscroll</url>
+  <url type="bugtracker">https://github.com/GAServantes/midscroll/issues</url>
+  <url type="vcs-browser">https://github.com/GAServantes/midscroll</url>
 
   <screenshots>
     <screenshot type="default">
@@ -81,6 +81,30 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.17" date="2026-10-20">
+      <description>
+        <p>
+          Every install method now includes the GNOME Shell extension, which
+          supports GNOME 45 through 50, and the .deb installs on Ubuntu 24.04.
+        </p>
+      </description>
+    </release>
+    <release version="1.16" date="2026-10-19">
+      <description>
+        <p>
+          On GNOME the cursor now moves freely while you scroll, like Windows,
+          and scrolling starts the moment you drag, smoothly and diagonally.
+        </p>
+      </description>
+    </release>
+    <release version="1.15" date="2026-08-26">
+      <description>
+        <p>
+          The held-still cursor jumps to where your hand is when a drag ends,
+          the way Windows autoscroll does.
+        </p>
+      </description>
+    </release>
     <release version="1.14" date="2026-07-28">
       <description>
         <p>

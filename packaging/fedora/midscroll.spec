@@ -1,5 +1,5 @@
 Name:           midscroll
-Version:        1.15
+Version:        1.17
 Release:        1%{?dist}
 Summary:        Windows-style middle-button drag autoscroll
 License:        GPL-3.0-or-later
@@ -19,6 +19,9 @@ Source10:       io.github.gnhen.midscroll.Settings.desktop
 Source11:       io.github.gnhen.midscroll.policy
 Source12:       SECURITY.md
 Source13:       io.github.gnhen.midscroll.Settings.metainfo.xml
+Source14:       extension.js
+Source15:       metadata.json
+Source16:       stylesheet.css
 
 Requires:       python3
 Requires:       python3-evdev
@@ -70,6 +73,11 @@ install -Dm644 %{SOURCE11} \
 # Software-center metadata, so the settings app shows up in Discover/GNOME Software
 install -Dm644 %{SOURCE13} \
     %{buildroot}%{_metainfodir}/io.github.gnhen.midscroll.Settings.metainfo.xml
+# GNOME Shell extension: does the scrolling on GNOME (see README.md)
+for f in %{SOURCE14} %{SOURCE15} %{SOURCE16}; do
+    install -Dm644 "$f" \
+        %{buildroot}%{_datadir}/gnome-shell/extensions/midscroll-indicator@midscroll/$(basename "$f")
+done
 install -d %{buildroot}%{_userpresetdir}
 echo "enable midscroll-overlay.service" \
     > %{buildroot}%{_userpresetdir}/90-midscroll.preset
@@ -112,9 +120,23 @@ fi
 %{_datadir}/applications/io.github.gnhen.midscroll.Settings.desktop
 %{_datadir}/polkit-1/actions/io.github.gnhen.midscroll.policy
 %{_metainfodir}/io.github.gnhen.midscroll.Settings.metainfo.xml
+%{_datadir}/gnome-shell/extensions/midscroll-indicator@midscroll/
 %config(noreplace) %{_sysconfdir}/midscroll.conf
 
 %changelog
+* Tue Oct 20 2026 G. Austin Servantes - 1.17-1
+- Install the GNOME Shell extension with every package and install.sh,
+  and turn it on for the installing user (install.sh); uninstall.sh
+  removes it
+- GNOME Shell 49 and 50 support (Ubuntu 26.04, Fedora 43/44)
+- The KDE overlay service skips itself where gtk4-layer-shell isn't
+  packaged, so the .deb installs on Ubuntu 24.04
+* Mon Oct 19 2026 G. Austin Servantes - 1.16-1
+- GNOME: a Shell extension does the scrolling as smooth pixel scroll and
+  keeps the pointer inside the window the drag started in
+- FREE_CURSOR (on by default): the pointer follows your hand while you
+  drag, like Windows; DEADZONE_PX 0 by default, CLICK_SLOP_PX decides
+  clicks
 * Tue Aug 26 2026 midscroll - 1.15-1
 - SNAP_CURSOR_ON_RELEASE: snap the anchored cursor to the ghost position
   once a drag-scroll ends, matching Windows autoscroll behavior

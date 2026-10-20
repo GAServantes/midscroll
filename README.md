@@ -2,6 +2,15 @@
 
 Windows-style middle-button drag autoscroll for Linux.
 
+> **This fork adds proper GNOME support** to
+> [gnhen/midscroll](https://github.com/gnhen/midscroll). A small GNOME Shell
+> extension does the scrolling from inside the compositor, so it starts the
+> moment you drag, stays smooth at slow speeds and pans diagonally, and the
+> cursor moves freely the way it does on Windows. Tested on GNOME 46
+> (Ubuntu 24.04) and GNOME 50 (Ubuntu 26.04). On KDE, set
+> `FREE_CURSOR = false` to get the original anchored cursor with the badge
+> and ghost cursor.
+
 Hold the middle mouse button and drag. The page scrolls in that direction,
 faster the farther you drag from where you pressed, like Windows 10/11.
 Release to stop. A quick middle click without dragging still works as a
@@ -58,10 +67,11 @@ sudo dnf install ./dist/midscroll-*.noarch.rpm
 sudo apt install ./dist/midscroll_*_all.deb
 ```
 
-Needs a release with gtk4-layer-shell packaged (Debian 13 "trixie",
-Ubuntu 24.04+). kdotool isn't in the Debian/Ubuntu repos, so the scroll
-badge needs it [built from source](https://github.com/jinliu/kdotool);
-everything else works without it.
+Installs on Debian 13 "trixie" and Ubuntu 24.04 or newer. The KDE scroll
+badge also needs gtk4-layer-shell (Debian 13, Ubuntu 24.10+) and kdotool,
+which isn't in the Debian/Ubuntu repos, so build it
+[from source](https://github.com/jinliu/kdotool); everything else works
+without them, and GNOME needs neither.
 
 ### Arch
 
@@ -82,7 +92,24 @@ gtk4-layer-shell, librsvg and kdotool.
 All methods install two services: `midscroll` (system, the scroll daemon)
 and `midscroll-overlay` (per-user, the badge). Package installs enable
 both; the overlay starts at your next login, or immediately with
-`systemctl --user start midscroll-overlay`.
+`systemctl --user start midscroll-overlay`. Where gtk4-layer-shell isn't
+installed the overlay skips itself.
+
+### GNOME
+
+Every install method also installs the GNOME Shell extension that does the
+scrolling on GNOME (`midscroll-indicator@midscroll`, GNOME 45-50).
+`install.sh` turns it on for you; then log out and back in once. After a
+package install, log out and back in, then turn it on:
+
+```
+gnome-extensions enable midscroll-indicator@midscroll
+```
+
+(or switch on **midscroll indicator** in the Extensions app). To check it's
+working, `journalctl -u midscroll -b | grep "does the scrolling"` should
+show the extension connecting. Without it, midscroll still scrolls on GNOME
+with ordinary wheel events, which libinput makes hesitant at slow speeds.
 
 ## Settings GUI
 
@@ -257,7 +284,7 @@ security review is genuinely welcome.
 
 ## License
 
-Copyright (C) 2026 GAServantes. Licensed under the
+Copyright (C) 2026 G. Austin Servantes. Licensed under the
 [GNU General Public License v3.0 or later](LICENSE): you may use, modify and
 share it, and anything you distribute that is built on it must be released
 under the same license with its source.
