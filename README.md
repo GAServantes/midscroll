@@ -10,6 +10,8 @@ Windows-style middle-button drag autoscroll for Linux.
 > (Ubuntu 24.04) and GNOME 50 (Ubuntu 26.04). On KDE, set
 > `FREE_CURSOR = false` to get the original anchored cursor with the badge
 > and ghost cursor.
+> The GNOME work is also offered upstream as
+> [gnhen/midscroll#17](https://github.com/gnhen/midscroll/pull/17).
 
 Hold the middle mouse button and drag. The page scrolls in that direction,
 faster the farther you drag from where you pressed, like Windows 10/11.
