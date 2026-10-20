@@ -20,17 +20,20 @@ particular desktop or toolkit.
 Details:
 
 - The speed curve is Chromium/Edge's actual Windows autoscroll formula
-  (`0.000008 * distance^2.2` px/ms, 15 px per-axis dead zone): tiny drags
-  crawl, a full-screen drag flies.
-- While scrolling, the real pointer stays anchored at the press point, so
-  the scroll stays locked to the window you started in. Dragging "over"
-  the taskbar or another window can't steal it.
-- It still looks like Windows while you do it: a badge with a
-  vertical-arrows icon stays locked at the press point, and a ghost cursor
-  follows your hand from there - a copy of your own pointer, read from
-  your cursor theme. The ghost is only drawn: it can't click, hover or
-  focus anything, which is what lets the scroll stay put while you see
-  where you are (KDE Plasma Wayland; see notes below).
+  (`0.000008 * distance^2.2` px/ms). There is no dead zone: scrolling
+  starts on the first pixel and the curve keeps tiny drags crawling,
+  while a full-screen drag flies. A release within 6 px of the press
+  point still counts as a middle click.
+- The cursor moves freely while you drag, like Windows, and the scroll
+  stays on the window you started in. On GNOME the midscroll Shell
+  extension (`gnome-extension/`) does the scrolling itself, as smooth
+  pixel scroll from inside the compositor, and keeps the pointer inside
+  that window with pointer barriers until you let go. Without it the
+  daemon falls back to hi-res wheel events, which libinput holds back
+  for the first half notch of every scroll and every direction change.
+- `FREE_CURSOR = false` anchors the real pointer at the press point
+  instead. On KDE Plasma Wayland a badge marks the press point and a
+  ghost cursor (a drawn copy of your pointer) follows your hand.
 - Apps that use middle-drag themselves (FreeCAD, OrcaSlicer and Minecraft
   by default) are blacklisted by window class: while one of them is
   focused, midscroll pauses itself and the middle button behaves natively.
@@ -99,7 +102,7 @@ Prefer a text file? Edit `/etc/midscroll.conf`, then
 `sudo systemctl restart midscroll`:
 
 ```
-DEADZONE_PX = 15          # per-axis dead zone in pixels
+DEADZONE_PX = 0           # per-axis dead zone in pixels (0 = immediate)
 SPEED_MULT = 0.008        # overall speed (bigger = faster everywhere)
 SPEED_EXP = 2.2           # curve shape (bigger = more extreme at long drags)
 PX_PER_NOTCH = 55         # px one wheel notch scrolls in your apps
@@ -107,7 +110,8 @@ TICK_HZ = 90              # scroll event rate (higher = smoother)
 NATURAL = false           # true = inverted / touchscreen-style direction
 TOGGLE_MODE = false       # true = click to start/stop instead of hold-drag
 DESKTOP_SCROLL = false    # true = also autoscroll over the desktop and panels
-GHOST_CURSOR = true       # draw a cursor that follows your hand while dragging
+FREE_CURSOR = true        # pointer follows your hand (false = anchored)
+GHOST_CURSOR = true       # anchored only: draw a cursor that follows your hand
 GHOST_SCALE = 1.0         # how far it travels per unit of mouse motion
 SNAP_CURSOR_ON_RELEASE = true   # snap the anchored cursor to the ghost
                                 # position once the drag ends

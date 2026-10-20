@@ -12,16 +12,18 @@ import time
 
 from evdev import InputDevice, UInput, ecodes as e, list_devices
 
-VERSION = "1.15"
+VERSION = "1.16"
 
 log = logging.getLogger("midscroll")
 
 # ---- Tuning (override in /etc/midscroll.conf or via CLI) ------------------
 # Speed curve from Chromium/Edge's autoscroll:
 #   velocity_px_per_sec = SPEED_MULT * |offset_px| ^ SPEED_EXP   (per axis)
-# with a 15 px per-axis dead zone. Chromium uses 0.000008 * d^2.2 in px/ms;
-# SPEED_MULT is that times 1000.
-DEADZONE_PX = 15.0        # per-axis dead zone, as in Chromium
+# Chromium uses 0.000008 * d^2.2 in px/ms; SPEED_MULT is that times 1000.
+# Chromium also has a 15 px dead zone; here scrolling starts on the first
+# pixel (the curve keeps tiny drags crawling) and CLICK_SLOP_PX alone decides
+# whether a press was a click.
+DEADZONE_PX = 0.0         # per-axis dead zone (0 = scroll immediately)
 SPEED_MULT = 0.008        # px/sec multiplier, overall speed
 SPEED_EXP = 2.2           # exponent: slow near the press point, fast far
 MAX_PX_PER_SEC = 30000.0  # safety cap on scroll speed
@@ -35,10 +37,11 @@ GHOST_CURSOR = True       # True: helper draws a cursor at the dragged point
 GHOST_SCALE = 1.0         # ghost travel per unit of mouse motion
 SNAP_CURSOR_ON_RELEASE = True   # True: warp the anchored cursor to the
                                 # ghost position once the drag ends
-FREE_CURSOR = False       # True: the pointer keeps moving during a drag
+FREE_CURSOR = True        # True: the pointer keeps moving during a drag
                           # (Windows-style) instead of staying anchored
 LOCK_WINDOW = True        # with FREE_CURSOR: keep scrolling the window the
                           # drag started in even after the pointer leaves it
+                          # (a scroll-capable helper does this itself)
 
 # Window-class substrings (case-insensitive) over which midscroll pauses
 # and the middle button behaves natively.
@@ -65,6 +68,8 @@ ALLOW_KEYBOARDS = False
 DESKTOP_SHELLS = ["plasmashell", "nemo-desktop", "xfdesktop", "waybar",
                   "xfce4-panel", "org.gnome.shell", "gjs"]
 
+CLICK_SLOP_PX = 6.0       # a release this close to the press point is still
+                          # a middle click, even if scrolling had started
 HIRES_PER_LINE = 120      # kernel convention: 120 hi-res units per notch
 MAX_TICK_DT = 0.25        # cap the per-tick time step (see ticker())
 GHOST_HZ = 60.0           # rate of ghost-cursor updates to the helper
@@ -333,6 +338,15 @@ class Notifier:
     the ghost cursor; reads "focus <window class>" lines back to drive the
     blacklist.
 
+    A helper that says "caps scroll" (the GNOME Shell extension) does the
+    scrolling itself while the cursor is free, as smooth pixel scroll from
+    inside the compositor, and keeps the pointer on the drag's window; it
+    gets the speed curve as a "cfg" line. While one is connected to the
+    active session the daemon emits no wheel events of its own. That
+    sidesteps libinput, which holds back the first half notch of every
+    hi-res wheel scroll and again on every direction change, so slow and
+    diagonal drags stalled.
+
     Security notes, because this socket is reachable by every logged-in
     user: only helpers running as a user logged in on a seat are accepted
     (_uid_has_seat), the number of connections is capped overall and per
@@ -352,6 +366,7 @@ class Notifier:
         self.active_uids = frozenset()
         self.screen = None      # (dx, dy) on-screen offset from a helper
         self.screen_t = 0.0
+        self.scrollers = set()  # writers whose helper scrolls by itself
 
     async def start(self):
         try:
@@ -395,6 +410,7 @@ class Notifier:
             self.active_uids |= {uid}
         try:
             writer.write(self.msg)
+            writer.write(cfg_line())
             while True:
                 line = await reader.readline()
                 if not line:
@@ -404,10 +420,14 @@ class Notifier:
                     self.focus.update(client, text[len("focus "):])
                 elif text.startswith("screen ") and uid in self.active_uids:
                     self._screen(text[len("screen "):])
+                elif text == "caps scroll" and writer not in self.scrollers:
+                    self.scrollers.add(writer)
+                    log.info("session helper (uid %s) does the scrolling", uid)
         except (OSError, ConnectionError, ValueError):
             pass  # ValueError: line over SOCK_LIMIT, drop the peer
         finally:
             self.writers.pop(writer, None)
+            self.scrollers.discard(writer)
             self.focus.remove(client)
             writer.close()
 
@@ -422,6 +442,12 @@ class Notifier:
             return
         self.screen = (_clamp(dx), _clamp(dy))
         self.screen_t = time.monotonic()
+
+    @property
+    def delegated(self):
+        """True if a helper in the active session does the scrolling."""
+        return FREE_CURSOR and any(self.writers.get(w) in self.active_uids
+                                   for w in self.scrollers)
 
     def offset(self, st):
         """Drag offset to drive speed from: on-screen if fresh, else raw."""
@@ -444,6 +470,7 @@ class Notifier:
 
     def _drop(self, writer):
         self.writers.pop(writer, None)
+        self.scrollers.discard(writer)
         try:
             writer.close()
         except (OSError, ConnectionError):
@@ -524,6 +551,7 @@ class State:
         self.eat_release = None   # button whose release to swallow (toggle)
         self.dx = 0.0             # cursor offset from the origin
         self.dy = 0.0
+        self.max_off = 0.0        # farthest the drag got, per axis
         self.acc_v = 0.0          # fractional hi-res units carried over
         self.acc_h = 0.0
         self.notch_v = 0.0        # hi-res units accumulated toward a notch
@@ -547,9 +575,11 @@ class State:
         """Return (was_click, dx, dy).
 
         dx/dy are the accumulated drag offset at release time, before it's
-        cleared.  A plain middle-click (no drag) returns dx=0, dy=0.
+        cleared.  A plain middle-click (no drag) returns dx=0, dy=0. A
+        drag that never got past CLICK_SLOP_PX is still a click.
         """
-        was_click = self.pending
+        was_click = self.pending or (self.active
+                                     and self.max_off <= CLICK_SLOP_PX)
         dx, dy = self.dx, self.dy
         self.reset()
         return was_click, dx, dy
@@ -584,6 +614,13 @@ def _accumulate(st, ev):
         st.dx = _clamp(st.dx + ev.value)
     else:
         st.dy = _clamp(st.dy + ev.value)
+
+
+def cfg_line():
+    """The speed curve, for a helper that scrolls by itself."""
+    return (b"cfg deadzone=%g mult=%g exp=%g maxSpeed=%g maxDrag=%g "
+            b"natural=%d\n" % (DEADZONE_PX, SPEED_MULT, SPEED_EXP,
+                               MAX_PX_PER_SEC, MAX_DRAG_PX, NATURAL))
 
 
 def speed_px(offset):
@@ -639,15 +676,20 @@ def tick(st, dt, focus, notifier):
             st.reset()
         return
     ox, oy = notifier.offset(st)
+    if st.pending or st.active:
+        st.max_off = max(st.max_off, abs(ox), abs(oy))
     if (not TOGGLE_MODE and st.pending
             and (abs(ox) > DEADZONE_PX or abs(oy) > DEADZONE_PX)):
         st.pending = False
         st.active = True
-        if FREE_CURSOR and LOCK_WINDOW:
+        delegated = notifier.delegated
+        if FREE_CURSOR and LOCK_WINDOW and not delegated:
             st.lock()
-        log.debug("scroll started")
+        log.debug("scroll started (%s)", "helper" if delegated else "wheel")
     if not st.scrolling:
         return
+    if st.active and notifier.delegated:
+        return  # the helper scrolls; see Notifier
     ui = st.ui
     s = 1 if NATURAL else -1
     to_hires = HIRES_PER_LINE / PX_PER_NOTCH
@@ -1179,6 +1221,10 @@ def parse_args(argv=None):
                    default=None, dest="ghost_cursor",
                    help="tell the session helper where to draw a ghost "
                         "cursor while dragging (default: on)")
+    p.add_argument("--free-cursor", action=argparse.BooleanOptionalAction,
+                   default=None, dest="free_cursor",
+                   help="let the pointer move while drag-scrolling, "
+                        "Windows-style (default: on); off anchors it")
     p.add_argument("--snap-cursor", action=argparse.BooleanOptionalAction,
                    default=None, dest="snap_cursor",
                    help="warp the anchored cursor to the ghost position "
@@ -1228,6 +1274,8 @@ def cli():
         globals()["GHOST_CURSOR"] = args.ghost_cursor
     if args.snap_cursor is not None:
         globals()["SNAP_CURSOR_ON_RELEASE"] = args.snap_cursor
+    if args.free_cursor is not None:
+        globals()["FREE_CURSOR"] = args.free_cursor
     if args.blacklist is not None:
         globals()["BLACKLIST"] = parse_blacklist(args.blacklist)
     for key, specs in (("EXTRA_DEVICES", args.extra_devices),
@@ -1238,11 +1286,13 @@ def cli():
         report_devices()
         return
     log.debug("tunables: %s NATURAL=%s TOGGLE_MODE=%s DESKTOP_SCROLL=%s "
-              "GHOST_CURSOR=%s SNAP_CURSOR=%s ALLOW_KEYBOARDS=%s BLACKLIST=%s "
+              "GHOST_CURSOR=%s SNAP_CURSOR=%s FREE_CURSOR=%s LOCK_WINDOW=%s "
+              "ALLOW_KEYBOARDS=%s BLACKLIST=%s "
               "EXTRA_DEVICES=%s IGNORE_DEVICES=%s",
               " ".join(f"{k}={globals()[k]:g}" for k in sorted(FLOAT_KEYS)),
               NATURAL, TOGGLE_MODE, DESKTOP_SCROLL, GHOST_CURSOR,
-              SNAP_CURSOR_ON_RELEASE, ALLOW_KEYBOARDS, BLACKLIST,
+              SNAP_CURSOR_ON_RELEASE, FREE_CURSOR, LOCK_WINDOW,
+              ALLOW_KEYBOARDS, BLACKLIST,
               EXTRA_DEVICES, IGNORE_DEVICES)
     asyncio.run(main())
 
