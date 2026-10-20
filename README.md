@@ -257,7 +257,12 @@ security review is genuinely welcome.
 
 ## License
 
-Public domain ([the Unlicense](https://unlicense.org)): use, copy, modify,
-sell or distribute freely. The badge icon is
+Copyright (C) 2026 GAServantes. Licensed under the
+[GNU General Public License v3.0 or later](LICENSE): you may use, modify and
+share it, and anything you distribute that is built on it must be released
+under the same license with its source.
+
+Based on [gnhen/midscroll](https://github.com/gnhen/midscroll), released
+into the public domain under the Unlicense. The badge icon is
 [move-vertical](https://lucide.dev/icons/move-vertical) from Lucide
 (ISC license).

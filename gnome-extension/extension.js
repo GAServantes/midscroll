@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // midscroll on GNOME Shell (Wayland or X11): visual feedback and the scroll
 // itself.
 //

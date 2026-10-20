@@ -2,7 +2,7 @@ Name:           midscroll
 Version:        1.15
 Release:        1%{?dist}
 Summary:        Windows-style middle-button drag autoscroll
-License:        Unlicense
+License:        GPL-3.0-or-later
 BuildArch:      noarch
 
 Source0:        midscroll.py

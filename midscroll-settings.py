@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """midscroll-settings - a small GTK4 GUI for midscroll's tunables.
 
 Reads the current /etc/midscroll.conf (world-readable), lets you change

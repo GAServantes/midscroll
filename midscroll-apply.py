@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """midscroll-apply - write /etc/midscroll.conf and restart the daemon.
 
 Run as root, normally through pkexec from the settings GUI. Takes the
