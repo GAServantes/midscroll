@@ -1,5 +1,5 @@
 Name:           midscroll
-Version:        1.17
+Version:        1.18
 Release:        1%{?dist}
 Summary:        Windows-style middle-button drag autoscroll
 License:        GPL-3.0-or-later
@@ -124,6 +124,9 @@ fi
 %config(noreplace) %{_sysconfdir}/midscroll.conf
 
 %changelog
+* Tue Oct 20 2026 G. Austin Servantes - 1.18-1
+- GNOME: the Shell extension stays on through the lock screen, so the
+  drag anchor and smooth scrolling no longer go missing after an unlock
 * Tue Oct 20 2026 G. Austin Servantes - 1.17-1
 - Install the GNOME Shell extension with every package and install.sh,
   and turn it on for the installing user (install.sh); uninstall.sh

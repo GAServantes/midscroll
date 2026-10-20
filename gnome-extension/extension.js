@@ -110,9 +110,11 @@ export default class MidscrollIndicator extends Extension {
     }
 
     // The topmost window under the point, or null over the desktop and the
-    // shell's own UI.
+    // shell's own UI. The extension stays on while the screen is locked (so
+    // GNOME never has to turn it back on at unlock); the windows are hidden
+    // behind the lock screen then, so none of them counts.
     _windowAt(x, y) {
-        if (Main.overview.visible)
+        if (Main.overview.visible || Main.sessionMode.isLocked)
             return null;
         const ws = global.workspace_manager.get_active_workspace();
         for (const actor of global.get_window_actors().reverse()) {

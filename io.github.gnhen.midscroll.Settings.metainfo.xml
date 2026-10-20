@@ -81,6 +81,14 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.18" date="2026-10-20">
+      <description>
+        <p>
+          On GNOME the drag anchor and smooth scrolling no longer go missing
+          after you lock and unlock the screen.
+        </p>
+      </description>
+    </release>
     <release version="1.17" date="2026-10-20">
       <description>
         <p>

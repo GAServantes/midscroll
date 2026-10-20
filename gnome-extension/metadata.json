@@ -3,6 +3,7 @@
   "name": "midscroll indicator",
   "description": "Does the scrolling for the midscroll daemon as smooth pixel scroll, keeps the pointer inside the window being scrolled, and draws the drag anchor and a live speed gauge.",
   "shell-version": ["45", "46", "47", "48", "49", "50"],
+  "session-modes": ["user", "unlock-dialog"],
   "url": "https://github.com/GAServantes/midscroll",
-  "version": 3
+  "version": 4
 }
