@@ -91,12 +91,14 @@ TOGGLE_MODE = {TOGGLE_MODE}
 DESKTOP_SCROLL = {DESKTOP_SCROLL}
 
 # Windows-style: the pointer follows your hand while you drag, and the scroll
-# stays on the window the drag started in. False holds the pointer still.
+# stays on the window the drag started in (but goes to whatever part of it is
+# under the pointer, like a browser's tab strip). False holds the pointer
+# still, so the scroll stays on the spot you pressed.
 FREE_CURSOR = {FREE_CURSOR}
 
 # Only with FREE_CURSOR = false: the session helper draws a cursor that
-# follows your hand (KDE Plasma). GHOST_SCALE is how far that drawn cursor
-# travels per unit of mouse motion.
+# follows your hand (GNOME, KDE Plasma). GHOST_SCALE is how far that drawn
+# cursor travels per unit of mouse motion.
 GHOST_CURSOR = {GHOST_CURSOR}
 GHOST_SCALE = {GHOST_SCALE:g}
 SNAP_CURSOR_ON_RELEASE = {SNAP_CURSOR_ON_RELEASE}    # True: snap the anchored

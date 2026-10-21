@@ -5,5 +5,5 @@
   "shell-version": ["45", "46", "47", "48", "49", "50"],
   "session-modes": ["user", "unlock-dialog"],
   "url": "https://github.com/GAServantes/midscroll",
-  "version": 5
+  "version": 6
 }

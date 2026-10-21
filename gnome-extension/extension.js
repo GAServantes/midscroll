@@ -43,8 +43,12 @@ const SCROLL_STEP = 10 / 256;
 // Until the daemon's "cfg" line arrives: its built-in defaults.
 const DEFAULT_CFG = {
     deadzone: 0, mult: 0.008, exp: 2.2, maxSpeed: 30000, maxDrag: 1200,
-    natural: false,
+    natural: false, free: true, ghost: true, snap: true, ghostScale: 1,
 };
+const BOOL_CFG = new Set(['natural', 'free', 'ghost', 'snap']);
+// The ghost cursor: an arrow outline in 24 px cursor units, tip at 0,0.
+const GHOST_ARROW = [[0, 0], [0, 17], [4, 13], [7, 20], [10, 19], [7, 12], [12, 12]];
+const GHOST_SIZE = 24;
 
 function hueColor(frac) {
     // 0 -> green (120deg), 1 -> red (0deg), via yellow/orange.
@@ -76,6 +80,7 @@ export default class MidscrollIndicator extends Extension {
         this._cfg = {...DEFAULT_CFG};
         this._lastTick = 0;
         this._carry = [0, 0];
+        this._pos = [0, 0];
         const seat = Clutter.get_default_backend().get_default_seat();
         this._vdev = seat.create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
         this._buildUi();
@@ -160,7 +165,26 @@ export default class MidscrollIndicator extends Extension {
         this._barriers = [];
     }
 
+    // FREE_CURSOR off: the daemon holds the real pointer at the anchor, so
+    // scrolls keep landing on the spot the drag started on (not the tab
+    // strip or toolbar the hand has moved over), and sends the hand's
+    // offset as "pos" lines for the ghost cursor to follow.
+    get _anchored() {
+        return !this._cfg.free;
+    }
+
+    // Where the hand is: the ghost when anchored, else the real pointer.
+    _hand() {
+        if (!this._anchored)
+            return global.get_pointer();
+        return [this._anchor[0] + this._pos[0], this._anchor[1] + this._pos[1]];
+    }
+
     _offset() {
+        if (this._anchored) {
+            const s = this._cfg.ghostScale || 1;
+            return [this._pos[0] / s, this._pos[1] / s];
+        }
         const [px, py] = global.get_pointer();
         return [px - this._anchor[0], py - this._anchor[1]];
     }
@@ -212,7 +236,30 @@ export default class MidscrollIndicator extends Extension {
             }));
         }
         this._label = new St.Label({style_class: 'midscroll-label', reactive: false});
-        for (const a of [this._vbar, this._hbar, this._badge, this._label])
+        const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+        this._ghost = new St.DrawingArea({
+            reactive: false, visible: false,
+            width: GHOST_SIZE * scale, height: GHOST_SIZE * scale,
+        });
+        this._ghost.connect('repaint', area => {
+            const cr = area.get_context();
+            const k = area.width / GHOST_SIZE;
+            cr.translate(1, 1);
+            for (const [i, [x, y]] of GHOST_ARROW.entries()) {
+                if (i)
+                    cr.lineTo(x * k, y * k);
+                else
+                    cr.moveTo(x * k, y * k);
+            }
+            cr.closePath();
+            cr.setSourceRGBA(1, 1, 1, 1);
+            cr.fillPreserve();
+            cr.setSourceRGBA(0, 0, 0, 1);
+            cr.setLineWidth(k);
+            cr.stroke();
+            cr.$dispose();
+        });
+        for (const a of [this._vbar, this._hbar, this._badge, this._label, this._ghost])
             this._group.add_child(a);
         Main.uiGroup.add_child(this._group);
     }
@@ -231,7 +278,7 @@ export default class MidscrollIndicator extends Extension {
         if (!this._active || !this._anchor)
             return;
         const [ax, ay] = this._anchor;
-        const [px, py] = global.get_pointer();
+        const [px, py] = this._hand();
         const dx = px - ax, dy = py - ay;
         const redAt = global.stage.height * RED_AT_FRACTION;
 
@@ -259,6 +306,10 @@ export default class MidscrollIndicator extends Extension {
             parts.push(`${vx > 0 ? '▶' : '◀'} ${fmtSpeed(vx)}`);
         this._label.text = parts.length ? `${parts.join('  ')} px/s` : '·';
         this._label.set_position(px + 22, py + 14);
+        // Mutter stops sending pointer events to apps while the pointer is
+        // hidden, so the real one stays visible at the anchor.
+        this._ghost.visible = this._anchored && this._cfg.ghost;
+        this._ghost.set_position(px - 1, py - 1);
     }
 
     // ---- pointer sampling ------------------------------------------------
@@ -274,8 +325,10 @@ export default class MidscrollIndicator extends Extension {
         this._timeline.connect('new-frame', () => {
             if (!this._anchor)
                 return;
-            const [dx, dy] = this._offset();
-            this._send(`screen ${Math.round(dx)} ${Math.round(dy)}\n`);
+            if (!this._anchored) {
+                const [dx, dy] = this._offset();
+                this._send(`screen ${Math.round(dx)} ${Math.round(dy)}\n`);
+            }
             const now = GLib.get_monotonic_time();
             if (this._active)
                 this._scroll(now);
@@ -305,6 +358,7 @@ export default class MidscrollIndicator extends Extension {
             this._out = this._conn.get_output_stream();
             this._in = new Gio.DataInputStream({base_stream: this._conn.get_input_stream()});
             this._send('caps scroll\n');
+            this._send('caps anchored\n');
             this._readLine();
         });
     }
@@ -379,8 +433,8 @@ export default class MidscrollIndicator extends Extension {
         for (const pair of text.split(' ')) {
             const [k, v] = pair.split('=');
             const n = Number(v);
-            if (k === 'natural')
-                cfg.natural = v === '1';
+            if (BOOL_CFG.has(k))
+                cfg[k] = v === '1';
             else if (k in cfg && Number.isFinite(n) && n >= 0)
                 cfg[k] = n;
         }
@@ -393,8 +447,15 @@ export default class MidscrollIndicator extends Extension {
             this._anchor = [px, py];
             this._window = this._windowAt(px, py);
             this._speed = [0, 0];
+            this._pos = [0, 0];
             this._startPoll();
         } else if (line === 'release') {
+            // Like Windows, the cursor ends up where the hand is.
+            if (this._anchor && this._anchored && this._cfg.snap &&
+                    (this._pos[0] || this._pos[1])) {
+                const [hx, hy] = this._hand();
+                Clutter.get_default_backend().get_default_seat().warp_pointer(hx, hy);
+            }
             this._anchor = null;
             this._window = null;
             this._active = false;
@@ -403,13 +464,17 @@ export default class MidscrollIndicator extends Extension {
             this._show(false);
         } else if (line === '1') {
             this._active = true;
-            if (this._window)
+            if (!this._anchored && this._window)
                 this._fence(this._window);
             this._show(true);
         } else if (line === '0') {
             this._active = false;
             this._unfence();
             this._show(false);
+        } else if (line.startsWith('pos ')) {
+            const [x, y] = line.slice(4).split(' ').map(Number);
+            if (Number.isFinite(x) && Number.isFinite(y))
+                this._pos = [x, y];
         } else if (line.startsWith('cfg ')) {
             this._onCfg(line.slice(4));
         }

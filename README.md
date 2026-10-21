@@ -11,9 +11,10 @@ Windows-style middle-button drag autoscroll for Linux.
 > extension does the scrolling from inside the compositor, so it starts the
 > moment you drag, stays smooth at slow speeds and pans diagonally, and the
 > cursor moves freely the way it does on Windows. Tested on GNOME 46
-> (Ubuntu 24.04) and GNOME 50 (Ubuntu 26.04). On KDE, set
-> `FREE_CURSOR = false` to get the original anchored cursor with the badge
-> and ghost cursor.
+> (Ubuntu 24.04) and GNOME 50 (Ubuntu 26.04). Set `FREE_CURSOR = false`
+> to keep the real pointer where you pressed instead, with a drawn cursor
+> following your hand (GNOME and KDE), so the scroll can't wander onto a
+> browser's tab strip.
 > The GNOME work is also offered upstream as
 > [gnhen/midscroll#17](https://github.com/gnhen/midscroll/pull/17).
 
@@ -51,9 +52,14 @@ Details:
   that window with pointer barriers until you let go. Without it the
   daemon falls back to hi-res wheel events, which libinput holds back
   for the first half notch of every scroll and every direction change.
-- `FREE_CURSOR = false` anchors the real pointer at the press point
-  instead. On KDE Plasma Wayland a badge marks the press point and a
-  ghost cursor (a drawn copy of your pointer) follows your hand.
+- With a free cursor the scroll goes to whatever part of that window is
+  under the pointer, so dragging up over a browser's tab strip scrolls
+  the tabs (Chromium-based browsers switch tabs). `FREE_CURSOR = false`
+  anchors the real pointer at the press point instead, so the scroll
+  stays where you pressed, like Windows. A badge marks the press point and
+  a ghost cursor (a drawn arrow on GNOME, a drawn copy of your pointer on
+  KDE Plasma Wayland) follows your hand; when you let go, the real
+  pointer jumps to it.
 - Apps that use middle-drag themselves (FreeCAD, OrcaSlicer and Minecraft
   by default) are blacklisted by window class: while one of them is
   focused, midscroll pauses itself and the middle button behaves natively.
@@ -224,10 +230,15 @@ sudo dnf remove midscroll         # or apt remove / pacman -R
 
 ## Notes
 
-- The badge and ghost cursor are KDE-specific: the anchor position comes
-  from kdotool, which uses KWin's scripting API, and they are drawn via
-  wlr-layer-shell. On other desktops the daemon still scrolls fine;
-  there's just nothing drawn. Wayland doesn't let a background process
+- On GNOME the Shell extension draws the badge and ghost cursor. GNOME
+  stops sending pointer events to apps while the pointer is hidden, so
+  with `FREE_CURSOR = false` the real pointer stays visible at the anchor
+  and the ghost is a drawn arrow. The ghost moves with your mouse's raw
+  counts, without GNOME's pointer acceleration; `GHOST_SCALE` tunes it.
+- On KDE the badge and ghost cursor come from `midscroll-overlay`: the
+  anchor position comes from kdotool, which uses KWin's scripting API, and
+  they are drawn via wlr-layer-shell. On other desktops the daemon still
+  scrolls fine; there's just nothing drawn. Wayland doesn't let a background process
   change or hide the real pointer image, so the real cursor is still there
   under the badge, and the ghost is a second cursor drawn beside it rather
   than the real one moving. That's also why it can't interact with

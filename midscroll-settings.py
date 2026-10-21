@@ -53,17 +53,19 @@ FLOATS = [
 # key, label, subtitle
 BOOLS = [
     ("FREE_CURSOR", "Cursor moves while scrolling",
-     "Windows-style: the pointer follows your hand while you drag, and the "
-     "scroll stays on the window you started in (on GNOME the pointer is "
-     "kept inside that window). Off holds the pointer still instead."),
+     "The pointer follows your hand while you drag, and the scroll stays on "
+     "the window you started in, but goes to whatever part of it is under "
+     "the pointer (moving over a browser's tabs scrolls the tabs). Off holds "
+     "the pointer still so the scroll stays where you pressed, and a drawn "
+     "cursor follows your hand instead."),
     ("TOGGLE_MODE", "Toggle mode",
      "Click the middle button to start autoscroll and again to stop, "
      "instead of holding and dragging."),
     ("NATURAL", "Natural scrolling", "Invert the scroll direction."),
     ("GHOST_CURSOR", "Ghost cursor",
      "Only when the cursor is held still: draw a cursor that follows your "
-     "hand from the anchor point (KDE Plasma only). It only draws - the "
-     "real pointer stays put."),
+     "hand from the anchor point (GNOME and KDE Plasma). It only draws - "
+     "the real pointer stays put."),
     ("SNAP_CURSOR_ON_RELEASE", "Snap cursor on release",
      "Only when the cursor is held still: when a drag-scroll ends, move "
      "the cursor to where your hand is."),

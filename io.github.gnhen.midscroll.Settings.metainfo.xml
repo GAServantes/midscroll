@@ -81,6 +81,15 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.20" date="2026-10-20">
+      <description>
+        <p>
+          On GNOME, turning off "Cursor moves while scrolling" now keeps the
+          scroll on the spot you pressed while a drawn cursor follows your
+          hand, so dragging over a browser's tabs no longer switches tabs.
+        </p>
+      </description>
+    </release>
     <release version="1.19" date="2026-10-20">
       <description>
         <p>

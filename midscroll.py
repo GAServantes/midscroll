@@ -13,7 +13,7 @@ import time
 
 from evdev import InputDevice, UInput, ecodes as e, list_devices
 
-VERSION = "1.19"
+VERSION = "1.20"
 
 log = logging.getLogger("midscroll")
 
@@ -368,6 +368,7 @@ class Notifier:
         self.screen = None      # (dx, dy) on-screen offset from a helper
         self.screen_t = 0.0
         self.scrollers = set()  # writers whose helper scrolls by itself
+        self.anchored = set()   # ... and can with the pointer held still
 
     async def start(self):
         try:
@@ -424,11 +425,14 @@ class Notifier:
                 elif text == "caps scroll" and writer not in self.scrollers:
                     self.scrollers.add(writer)
                     log.info("session helper (uid %s) does the scrolling", uid)
+                elif text == "caps anchored":
+                    self.anchored.add(writer)
         except (OSError, ConnectionError, ValueError):
             pass  # ValueError: line over SOCK_LIMIT, drop the peer
         finally:
             self.writers.pop(writer, None)
             self.scrollers.discard(writer)
+            self.anchored.discard(writer)
             self.focus.remove(client)
             writer.close()
 
@@ -446,9 +450,13 @@ class Notifier:
 
     @property
     def delegated(self):
-        """True if a helper in the active session does the scrolling."""
-        return FREE_CURSOR and any(self.writers.get(w) in self.active_uids
-                                   for w in self.scrollers)
+        """True if a helper in the active session does the scrolling.
+
+        With the pointer held still, only one that says "caps anchored":
+        an older helper reads the speed from the pointer, which won't move.
+        """
+        helpers = self.scrollers if FREE_CURSOR else self.anchored
+        return any(self.writers.get(w) in self.active_uids for w in helpers)
 
     def offset(self, st):
         """Drag offset to drive speed from: on-screen if fresh, else raw."""
@@ -472,6 +480,7 @@ class Notifier:
     def _drop(self, writer):
         self.writers.pop(writer, None)
         self.scrollers.discard(writer)
+        self.anchored.discard(writer)
         try:
             writer.close()
         except (OSError, ConnectionError):
@@ -620,8 +629,10 @@ def _accumulate(st, ev):
 def cfg_line():
     """The speed curve, for a helper that scrolls by itself."""
     return (b"cfg deadzone=%g mult=%g exp=%g maxSpeed=%g maxDrag=%g "
-            b"natural=%d\n" % (DEADZONE_PX, SPEED_MULT, SPEED_EXP,
-                               MAX_PX_PER_SEC, MAX_DRAG_PX, NATURAL))
+            b"natural=%d free=%d ghost=%d snap=%d ghostScale=%g\n"
+            % (DEADZONE_PX, SPEED_MULT, SPEED_EXP, MAX_PX_PER_SEC,
+               MAX_DRAG_PX, NATURAL, FREE_CURSOR, GHOST_CURSOR,
+               SNAP_CURSOR_ON_RELEASE, GHOST_SCALE))
 
 
 def speed_px(offset):
@@ -663,8 +674,9 @@ async def ticker(states, notifier, focus):
                 notifier.speed(speed_px(ox), speed_px(oy))
                 # Only an anchored drag has a ghost: with a free cursor or
                 # in toggle mode the real cursor moves, so there is nothing
-                # to stand in for it.
-                if GHOST_CURSOR and not FREE_CURSOR:
+                # to stand in for it. A helper that scrolls by itself needs
+                # the offset either way: the pointer it would read holds still.
+                if not FREE_CURSOR and (GHOST_CURSOR or notifier.delegated):
                     notifier.pos(dragging.dx * GHOST_SCALE,
                                  dragging.dy * GHOST_SCALE)
 
@@ -900,9 +912,12 @@ async def pump(path, dev, states, tasks, focus, our_paths, notifier):
                     else:
                         was_click, dx, dy = st.release()
                         notifier.event(b"release\n")
-                        if SNAP_CURSOR_ON_RELEASE and not FREE_CURSOR:
+                        if (SNAP_CURSOR_ON_RELEASE and not FREE_CURSOR
+                                and not notifier.delegated):
                             # Catch the anchored cursor up to wherever the real
-                            # mouse ended up, like Windows does.
+                            # mouse ended up, like Windows does. A helper that
+                            # scrolls warps it there itself: these relative
+                            # counts would be accelerated by the compositor.
                             sx, sy = int(dx), int(dy)
                             if sx or sy:
                                 log.info("snap cursor: dx=%g dy=%g", sx, sy)

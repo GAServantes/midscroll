@@ -1,5 +1,5 @@
 Name:           midscroll
-Version:        1.19
+Version:        1.20
 Release:        1%{?dist}
 Summary:        Windows-style middle-button drag autoscroll
 License:        GPL-3.0-or-later
@@ -124,6 +124,11 @@ fi
 %config(noreplace) %{_sysconfdir}/midscroll.conf
 
 %changelog
+* Tue Oct 20 2026 G. Austin Servantes - 1.20-1
+- GNOME: FREE_CURSOR = false works with the Shell extension: smooth
+  scrolling stays on the spot you pressed while a drawn ghost cursor
+  follows your hand, so dragging over a browser's tabs no longer
+  switches them; the pointer jumps to the ghost on release
 * Tue Oct 20 2026 G. Austin Servantes - 1.19-1
 - GNOME: slow scrolling moves in sub-pixel steps instead of whole
   pixels, which Chromium-based browsers turned into 12 px jumps
