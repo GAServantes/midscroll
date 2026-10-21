@@ -32,8 +32,9 @@
       Windows autoscroll, so short drags crawl and long drags fly.</li>
       <li>The cursor stays anchored at the press point while scrolling, so
       the scroll stays locked to the window you started in.</li>
-      <li>Optionally, like Windows, a middle click starts autoscroll too,
-      and the next click stops it.</li>
+      <li>Like Windows, a middle click starts autoscroll too, and the next
+      click stops it; on GNOME, links and browser tabs keep their middle
+      click.</li>
       <li>An app blacklist that pauses midscroll over programs with their
       own middle-drag, such as FreeCAD, OrcaSlicer and Minecraft.</li>
       <li>A settings window for speed, dead zone, event rate, natural
@@ -81,6 +82,16 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.24" date="2026-10-20">
+      <description>
+        <p>
+          "Click to scroll too" is on by default: a middle click starts
+          autoscroll like Windows, while links and browser tabs keep their
+          middle click on GNOME. The GNOME extension draws no indicator by
+          default; the other styles are in its settings.
+        </p>
+      </description>
+    </release>
     <release version="1.23" date="2026-10-20">
       <description>
         <p>

@@ -19,10 +19,10 @@
 //     barriers, so the scroll can't wander into another window. (Holding a
 //     button would do it without fences, but Mutter only keeps an implicit
 //     grab for buttons 1-5, so the daemon's lock button does nothing here.)
-//   - draws an indicator while the drag scrolls: by default a small ring
-//     at the anchor that lights the arrows you're pulling toward, and a
-//     line fading in from the ring to the hand. The look (ring and trail,
-//     ring only, the older bars and badge, or nothing), its color, size,
+//   - can draw an indicator while the drag scrolls (none by default): a
+//     small ring at the anchor that lights the arrows you're pulling
+//     toward, with or without a line fading in from the ring to the hand,
+//     or the older bars and badge. The look, its color, size,
 //     opacity and a speed readout are per-user settings (prefs.js);
 //     changing one plays a short preview mid-screen.
 //   - on "press", tells the daemon whether a plain middle click there
@@ -47,7 +47,7 @@ const RING_SIZE = 28;
 const TRAIL_WIDTH = 3;
 const PREVIEW_US = 4e6;
 // Used until the settings load, or for good if their schema is missing.
-const LOOK_DEFAULTS = {style: 'ring-trail', color: 'accent', showSpeed: false, opacity: 0.85, size: 1};
+const LOOK_DEFAULTS = {style: 'hidden', color: 'accent', showSpeed: false, opacity: 0.85, size: 1};
 // libadwaita's accent colors (GNOME 47+), and Ubuntu's Yaru accents, which
 // GNOME 46 on Ubuntu names in the theme ("Yaru-blue-dark"; plain Yaru is
 // orange).

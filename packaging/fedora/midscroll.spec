@@ -1,5 +1,5 @@
 Name:           midscroll
-Version:        1.23
+Version:        1.24
 Release:        1%{?dist}
 Summary:        Windows-style middle-button drag autoscroll
 License:        GPL-3.0-or-later
@@ -132,6 +132,10 @@ fi
 %config(noreplace) %{_sysconfdir}/midscroll.conf
 
 %changelog
+* Tue Oct 20 2026 G. Austin Servantes - 1.24-1
+- TOGGLE_MODE ("Click to scroll too") is on by default
+- GNOME: the extension draws no indicator by default; the ring, trail and
+  bars styles are in its settings
 * Tue Oct 20 2026 G. Austin Servantes - 1.23-1
 - GNOME, TOGGLE_MODE: a middle click on a link (the app shows its hand
   cursor) or on a browser's tabs and toolbars stays a middle click, so it

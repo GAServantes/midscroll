@@ -22,20 +22,19 @@ Windows-style middle-button drag autoscroll for Linux.
 
 <sub>Recorded in GNOME Shell 50 with the "Bars" style and speed colors: the
 bar turns from green to red as you drag farther; drag back past the anchor
-to scroll the other way. The default look is quieter: a small ring at the
-press point and a thin line fading in toward your hand.</sub>
+to scroll the other way. By default nothing is drawn; this look and a
+quieter ring with a fading line are in the extension's settings.</sub>
 
 Hold the middle mouse button and drag. The page scrolls in that direction,
 faster the farther you drag from where you pressed, like Windows 10/11.
-Release to stop. A quick middle click without dragging still works as a
-normal middle click (paste, open link in new tab). Diagonal drags scroll
-both axes, so it pans wide pages too.
+Release to stop. Diagonal drags scroll both axes, so it pans wide pages
+too.
 
-Want clicking as well as holding, like Windows? Turn on **Click to scroll
-too** (in the settings GUI, or `TOGGLE_MODE = true`): a middle click
-without dragging then starts autoscroll, you move the mouse to set the
-speed, and the next click of any button stops it. Holding and dragging
-works the same as before. On GNOME, a middle click still opens a link in a
+A middle click without dragging also starts autoscroll, like Windows: move
+the mouse to set the speed, and the next click of any button stops it.
+This is **Click to scroll too** in the settings GUI (`TOGGLE_MODE`, on by
+default); turn it off and a quick middle click is an ordinary middle click
+again (paste, open link in new tab). On GNOME, a middle click still opens a link in a
 new tab: the extension checks whether the app is showing its link hand
 (the hand cursor's hot spot is read from your cursor theme, so it can't be
 mistaken for the arrow). A browser's tabs, toolbar and bookmarks bar (the
@@ -143,10 +142,11 @@ style** in midscroll Settings, or `gnome-extensions prefs
 midscroll-indicator@midscroll`) change what's drawn while you drag, per
 user and without a password:
 
-- **Style**: *Ring and trail* (the default: a small ring at the press
-  point that lights the arrows you're pulling toward, and a line fading in
-  toward your hand), *Ring only*, *Bars* (the older badge and colored bars)
-  or *Nothing*.
+- **Style**: *Nothing* (the default), *Ring and trail* (a small ring at
+  the press point that lights the arrows you're pulling toward, and a line
+  fading in toward your hand), *Ring only* or *Bars* (the older badge and
+  colored bars). With the pointer held still, the drawn cursor that
+  follows your hand shows whatever the style.
 - **Color**: the desktop's accent color, *Speed* (green to red as you go
   faster) or white.
 - **Size**, **Opacity** and **Show speed** (a px/s readout by the pointer).
@@ -177,7 +177,7 @@ SPEED_EXP = 2.2           # curve shape (bigger = more extreme at long drags)
 PX_PER_NOTCH = 55         # px one wheel notch scrolls in your apps
 TICK_HZ = 90              # scroll event rate (higher = smoother)
 NATURAL = false           # true = inverted / touchscreen-style direction
-TOGGLE_MODE = false       # true = a middle click also starts autoscroll
+TOGGLE_MODE = true        # false = only hold-and-drag scrolls
 DESKTOP_SCROLL = false    # true = also autoscroll over the desktop and panels
 FREE_CURSOR = true        # pointer follows your hand (false = anchored)
 GHOST_CURSOR = true       # anchored only: draw a cursor that follows your hand

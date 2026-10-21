@@ -8,9 +8,9 @@
         <choice value="classic"/>
         <choice value="hidden"/>
       </choices>
-      <default>'ring-trail'</default>
+      <default>'hidden'</default>
       <summary>What to draw while drag-scrolling</summary>
-      <description>ring-trail: a small ring at the anchor and a fading line to the hand. ring: just the ring. classic: the colored bars and speed badge. hidden: nothing (the ghost cursor still shows when the pointer is held still).</description>
+      <description>hidden (the default): nothing (the ghost cursor still shows when the pointer is held still). ring-trail: a small ring at the anchor and a fading line to the hand. ring: just the ring. classic: the colored bars and speed badge.</description>
     </key>
     <key name="color" type="s">
       <choices>

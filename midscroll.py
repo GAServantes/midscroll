@@ -13,7 +13,7 @@ import time
 
 from evdev import InputDevice, UInput, ecodes as e, list_devices
 
-VERSION = "1.23"
+VERSION = "1.24"
 
 log = logging.getLogger("midscroll")
 
@@ -32,7 +32,7 @@ PX_PER_NOTCH = 55.0       # how many px one wheel notch scrolls in your apps
 MAX_DRAG_PX = 1200.0      # cap on effective drag distance (~screen height)
 TICK_HZ = 90.0            # scroll event rate (higher = smoother)
 NATURAL = False           # True inverts scroll direction
-TOGGLE_MODE = False       # True: a middle click also starts autoscroll
+TOGGLE_MODE = True        # True: a middle click also starts autoscroll
                           # (Windows style); hold-and-drag works either way
 DESKTOP_SCROLL = False    # True: also autoscroll over the desktop and panels
 GHOST_CURSOR = True       # True: helper draws a cursor at the dragged point
@@ -1229,8 +1229,8 @@ def parse_args(argv=None):
     p.add_argument("--toggle-mode", action=argparse.BooleanOptionalAction,
                    default=None, dest="toggle_mode",
                    help="a middle click also starts autoscroll, and the "
-                        "next click stops it (Windows style); hold-and-drag "
-                        "works either way")
+                        "next click stops it (Windows style; default: on); "
+                        "hold-and-drag works either way")
     p.add_argument("--desktop", action=argparse.BooleanOptionalAction,
                    default=None, dest="desktop_scroll",
                    help="also autoscroll over the desktop and panels "

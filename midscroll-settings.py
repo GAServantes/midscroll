@@ -81,7 +81,7 @@ DEFAULTS = {
     "DEADZONE_PX": 0.0, "SPEED_MULT": 0.008, "SPEED_EXP": 2.2,
     "MAX_PX_PER_SEC": 30000.0, "PX_PER_NOTCH": 55.0, "MAX_DRAG_PX": 1200.0,
     "TICK_HZ": 90.0, "GHOST_SCALE": 1.0, "NATURAL": False,
-    "TOGGLE_MODE": False, "DESKTOP_SCROLL": False, "GHOST_CURSOR": True,
+    "TOGGLE_MODE": True, "DESKTOP_SCROLL": False, "GHOST_CURSOR": True,
     "SNAP_CURSOR_ON_RELEASE": True, "FREE_CURSOR": True,
     "BLACKLIST": "freecad, orcaslicer, minecraft",
     "EXTRA_DEVICES": "", "IGNORE_DEVICES": "",

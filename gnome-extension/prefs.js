@@ -10,11 +10,11 @@ import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/ex
 
 // value, title, subtitle
 const STYLES = [
+    ['hidden', 'Nothing', 'No indicator while scrolling'],
     ['ring-trail', 'Ring and trail',
         'A small ring where you pressed, and a line fading in toward your hand'],
     ['ring', 'Ring only', 'Just the ring where you pressed'],
     ['classic', 'Bars', 'The older look: a badge and a bar along each direction you drag'],
-    ['hidden', 'Nothing', 'No indicator while scrolling'],
 ];
 const COLORS = [
     ['accent', 'Accent color', 'Follows the desktop’s accent color'],
