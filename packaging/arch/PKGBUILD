@@ -1,9 +1,9 @@
 pkgname=midscroll
-pkgver=1.24
+pkgver=1.25
 pkgrel=1
-pkgdesc="Windows-style middle-button drag autoscroll (kernel-level, works on Wayland and X11)"
+pkgdesc="Scroll Goblin: Windows-style middle-button autoscroll (kernel-level, works on Wayland and X11)"
 arch=('any')
-url="https://github.com/GAServantes/midscroll"
+url="https://github.com/GAServantes/scroll-goblin"
 license=('GPL-3.0-or-later')
 depends=('python' 'python-evdev' 'python-gobject' 'python-cairo' 'gtk4'
          'gtk4-layer-shell' 'librsvg' 'polkit')

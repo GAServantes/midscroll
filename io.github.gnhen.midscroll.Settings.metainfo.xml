@@ -2,7 +2,7 @@
 <component type="desktop-application">
   <id>io.github.gnhen.midscroll.Settings</id>
 
-  <name>midscroll</name>
+  <name>Scroll Goblin</name>
   <summary>Windows-style middle-button drag autoscroll</summary>
 
   <metadata_license>CC0-1.0</metadata_license>
@@ -16,10 +16,9 @@
     <p>
       Hold the middle mouse button and drag. The page scrolls in that
       direction, faster the farther you drag from where you pressed, like
-      Windows 10 and 11. Release to stop. A quick middle click without
-      dragging still works as a normal middle click, so paste and
-      open-link-in-new-tab are unaffected. Diagonal drags scroll both axes,
-      so wide pages pan too.
+      Windows 10 and 11. Release to stop. A middle click without dragging
+      starts autoscroll too, and the next click stops it. Diagonal drags
+      scroll both axes, so wide pages pan too.
     </p>
     <p>
       It works in every application, on both Wayland and X11, because it
@@ -30,15 +29,18 @@
     <ul>
       <li>The speed curve is the same formula Chromium and Edge use for
       Windows autoscroll, so short drags crawl and long drags fly.</li>
-      <li>The cursor stays anchored at the press point while scrolling, so
-      the scroll stays locked to the window you started in.</li>
+      <li>The scroll stays locked to the window you started in, with the
+      cursor either following your hand or held where you pressed.</li>
+      <li>On GNOME, a Shell extension scrolls smoothly from inside the
+      desktop, even at the slowest speeds.</li>
       <li>Like Windows, a middle click starts autoscroll too, and the next
       click stops it; on GNOME, links and browser tabs keep their middle
       click.</li>
-      <li>An app blacklist that pauses midscroll over programs with their
+      <li>An app blacklist that pauses it over programs with their
       own middle-drag, such as FreeCAD, OrcaSlicer and Minecraft.</li>
-      <li>A settings window for speed, dead zone, event rate, natural
-      scrolling and the blacklist.</li>
+      <li>A settings window for speed, click to scroll, the cursor,
+      natural scrolling, devices and the blacklist, plus an optional
+      on-screen indicator on GNOME.</li>
     </ul>
     <p>
       This package installs a background daemon that reads mouse input
@@ -55,14 +57,14 @@
     <binary>midscroll-settings</binary>
   </provides>
 
-  <url type="homepage">https://github.com/GAServantes/midscroll</url>
-  <url type="bugtracker">https://github.com/GAServantes/midscroll/issues</url>
-  <url type="vcs-browser">https://github.com/GAServantes/midscroll</url>
+  <url type="homepage">https://github.com/GAServantes/scroll-goblin</url>
+  <url type="bugtracker">https://github.com/GAServantes/scroll-goblin/issues</url>
+  <url type="vcs-browser">https://github.com/GAServantes/scroll-goblin</url>
 
   <screenshots>
     <screenshot type="default">
       <image width="1248" height="702">https://raw.githubusercontent.com/gnhen/midscroll/main/screenshots/logo.png</image>
-      <caption>The midscroll logo</caption>
+      <caption>The original midscroll logo</caption>
     </screenshot>
   </screenshots>
 
@@ -82,6 +84,15 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.25" date="2026-10-20">
+      <description>
+        <p>
+          The app is now called Scroll Goblin. Its command, package,
+          settings file and GNOME extension keep the midscroll name under
+          the hood, so nothing needs setting up again.
+        </p>
+      </description>
+    </release>
     <release version="1.24" date="2026-10-20">
       <description>
         <p>

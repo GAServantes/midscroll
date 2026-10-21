@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""midscroll-settings - a small GTK4 GUI for midscroll's tunables.
+"""midscroll-settings - a small GTK4 GUI for Scroll Goblin's (midscroll's) tunables.
 
 Reads the current /etc/midscroll.conf (world-readable), lets you change
 every setting - including click to scroll and which devices count as a mouse -
@@ -269,7 +269,7 @@ def find_apply():
 
 class Window(Gtk.ApplicationWindow):
     def __init__(self, app):
-        super().__init__(application=app, title="midscroll")
+        super().__init__(application=app, title="Scroll Goblin")
         self.set_default_size(520, -1)
         self.floats = {}
         self.bools = {}
@@ -329,7 +329,7 @@ class Window(Gtk.ApplicationWindow):
 
         box.append(self._heading("App blacklist"))
         hint = Gtk.Label(
-            label="Comma-separated window-class substrings midscroll pauses "
+            label="Comma-separated window-class substrings Scroll Goblin pauses "
                   "over (apps with their own middle-drag). Leave empty to "
                   "disable.",
             wrap=True, xalign=0)
@@ -439,7 +439,7 @@ class Window(Gtk.ApplicationWindow):
         box.append(head)
 
         hint = Gtk.Label(
-            label="midscroll picks up ordinary mice by itself. Turn a "
+            label="Scroll Goblin picks up ordinary mice by itself. Turn a "
                   "device on to use it anyway, or off to leave it alone. "
                   "Only a device with a middle button and relative axes "
                   "can actually autoscroll; anything you turn on here is "
@@ -496,7 +496,7 @@ class Window(Gtk.ApplicationWindow):
         if blocked:
             switch.set_sensitive(False)
             switch.set_tooltip_text(
-                "midscroll never grabs a keyboard unless ALLOW_KEYBOARDS "
+                "Scroll Goblin never grabs a keyboard unless ALLOW_KEYBOARDS "
                 f"is set in {CONFIG_PATH}, which only root can do.")
         row.append(switch)
         self.device_rows.append((rec, spec, auto, switch))
@@ -663,7 +663,7 @@ class Window(Gtk.ApplicationWindow):
             self.set_status(f"Apply failed: {exc.message}")
             return
         if proc.get_exit_status() == 0:
-            self.set_status("Applied and restarted midscroll.")
+            self.set_status("Applied and restarted Scroll Goblin.")
         else:
             detail = (err or "").strip().splitlines()
             msg = detail[-1] if detail else "authorization dismissed"

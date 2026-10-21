@@ -9,7 +9,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 repo=$(cd ../.. && pwd)
 
-version=1.24-1
+version=1.25-1
 maintainer=${DEB_MAINTAINER:-"midscroll maintainers <noreply@example.com>"}
 
 work=$(mktemp -d)
@@ -55,13 +55,13 @@ Architecture: all
 Depends: python3, python3-evdev, python3-gi, python3-gi-cairo, gir1.2-gtk-4.0, librsvg2-common, polkitd | policykit-1
 Recommends: libgtk4-layer-shell0, gir1.2-gtk4layershell-1.0, kdotool, x11-utils
 Maintainer: $maintainer
-Description: Windows-style middle-button drag autoscroll
- Hold the middle mouse button and drag to scroll, with speed proportional
- to drag distance, like Windows 10/11. Works on Wayland and X11 in every
+Description: Scroll Goblin, Windows-style middle-button autoscroll
+ Hold the middle mouse button and drag, or click it, to scroll, with speed
+ growing with distance, like Windows 10/11. Works on Wayland and X11 in every
  application by operating at the kernel input layer (evdev/uinput).
  .
- Includes a GNOME Shell extension that does the scrolling on GNOME with a
- free-moving cursor, and a session overlay that shows a scroll badge at the
+ Includes a GNOME Shell extension that does the scrolling on GNOME, and a
+ session overlay that shows a scroll badge at the
  anchored cursor while a drag-scroll is active (KDE Plasma; needs kdotool
  and gtk4-layer-shell).
 EOF

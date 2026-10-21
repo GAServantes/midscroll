@@ -1,21 +1,20 @@
-# midscroll
+# Scroll Goblin
 
-<a href="https://github.com/GAServantes/midscroll/actions/workflows/ci.yml"><img src="https://github.com/GAServantes/midscroll/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-<a href="https://github.com/GAServantes/midscroll/releases/latest"><img src="https://img.shields.io/github/v/release/GAServantes/midscroll" alt="Latest release"></a>
+<a href="https://github.com/GAServantes/scroll-goblin/actions/workflows/ci.yml"><img src="https://github.com/GAServantes/scroll-goblin/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+<a href="https://github.com/GAServantes/scroll-goblin/releases/latest"><img src="https://img.shields.io/github/v/release/GAServantes/scroll-goblin" alt="Latest release"></a>
 <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue" alt="License: GPL-3.0-or-later"></a>
 
-Windows-style middle-button drag autoscroll for Linux.
+Windows-style middle-button autoscroll for Linux: hold and drag, or click,
+and the page scrolls faster the farther you move.
 
-> **This fork adds proper GNOME support** to
-> [gnhen/midscroll](https://github.com/gnhen/midscroll). A small GNOME Shell
-> extension does the scrolling from inside the compositor, so it starts the
-> moment you drag, stays smooth at slow speeds and pans diagonally, and the
-> cursor moves freely the way it does on Windows. Tested on GNOME 46
-> (Ubuntu 24.04) and GNOME 50 (Ubuntu 26.04). Set `FREE_CURSOR = false`
-> to keep the real pointer where you pressed instead, with a drawn cursor
-> following your hand (GNOME and KDE), so the scroll can't wander onto a
-> browser's tab strip.
-> The GNOME work is also offered upstream as
+> **Scroll Goblin is a fork of [gnhen/midscroll](https://github.com/gnhen/midscroll)**
+> with proper GNOME support. Under the hood it still goes by `midscroll`:
+> the command, package, services, config file (`/etc/midscroll.conf`) and
+> GNOME extension ID keep that name, so existing installs upgrade in
+> place. A small GNOME Shell extension does the scrolling from inside the
+> compositor, so it starts the moment you drag, stays smooth even at the
+> slowest speeds and pans diagonally. Tested on GNOME 46 (Ubuntu 24.04)
+> and GNOME 50 (Ubuntu 26.04). The GNOME work is also offered upstream as
 > [gnhen/midscroll#17](https://github.com/gnhen/midscroll/pull/17).
 
 ![Hold the middle button and drag: the page scrolls faster the farther you go, with the anchor, a speed bar and a px/s readout drawn by the GNOME extension](screenshots/gnome-demo.gif)
@@ -34,8 +33,8 @@ A middle click without dragging also starts autoscroll, like Windows: move
 the mouse to set the speed, and the next click of any button stops it.
 This is **Click to scroll too** in the settings GUI (`TOGGLE_MODE`, on by
 default); turn it off and a quick middle click is an ordinary middle click
-again (paste, open link in new tab). On GNOME, a middle click still opens a link in a
-new tab: the extension checks whether the app is showing its link hand
+again (paste, open link in new tab). On GNOME, a middle click still opens
+a link in a new tab: the extension checks whether the app is showing its link hand
 (the hand cursor's hot spot is read from your cursor theme, so it can't be
 mistaken for the arrow). A browser's tabs, toolbar and bookmarks bar (the
 top 120 px of the window) keep the middle click too, so it still closes or
@@ -55,25 +54,28 @@ Details:
   while a full-screen drag flies. A release within 6 px of the press
   point still counts as a middle click.
 - The cursor moves freely while you drag, like Windows, and the scroll
-  stays on the window you started in. On GNOME the midscroll Shell
+  stays on the window you started in. On GNOME the Shell
   extension (`gnome-extension/`) does the scrolling itself, as smooth
   pixel scroll from inside the compositor, and keeps the pointer inside
   that window with pointer barriers until you let go. Without it the
   daemon falls back to hi-res wheel events, which libinput holds back
   for the first half notch of every scroll and every direction change.
+  Slow drags move in sub-pixel steps, so even a crawl is smooth in
+  Chromium-based browsers, which magnify each step.
 - With a free cursor the scroll goes to whatever part of that window is
   under the pointer, so dragging up over a browser's tab strip scrolls
   the tabs (Chromium-based browsers switch tabs). `FREE_CURSOR = false`
   anchors the real pointer at the press point instead, so the scroll
-  stays where you pressed, like Windows. A badge marks the press point and
-  a ghost cursor (a drawn arrow on GNOME, a drawn copy of your pointer on
-  KDE Plasma Wayland) follows your hand; when you let go, the real
-  pointer jumps to it.
+  stays where you pressed, like Windows. A ghost cursor follows your hand
+  instead: on GNOME a drawn arrow, with the real pointer hidden until you
+  let go; on KDE Plasma Wayland a drawn copy of your pointer beside a
+  badge at the press point. When you let go, the real pointer jumps to
+  where your hand is.
 - Apps that use middle-drag themselves (FreeCAD, OrcaSlicer and Minecraft
   by default) are blacklisted by window class: while one of them is
-  focused, midscroll pauses itself and the middle button behaves natively.
+  focused, Scroll Goblin pauses itself and the middle button behaves natively.
 - The desktop and panels are left alone by default: while a desktop shell
-  (plasmashell, xfdesktop, waybar, GNOME Shell, ...) is focused midscroll
+  (plasmashell, xfdesktop, waybar, GNOME Shell, ...) is focused it
   pauses, so a middle-drag can't hijack the desktop. Turn on **Enable on
   desktop & panels** (`DESKTOP_SCROLL = true`) if you want it there too.
 
@@ -132,13 +134,13 @@ package install, log out and back in, then turn it on:
 gnome-extensions enable midscroll-indicator@midscroll
 ```
 
-(or switch on **midscroll indicator** in the Extensions app). To check it's
+(or switch on **Scroll Goblin** in the Extensions app). To check it's
 working, `journalctl -u midscroll -b | grep "does the scrolling"` should
-show the extension connecting. Without it, midscroll still scrolls on GNOME
+show the extension connecting. Without it, Scroll Goblin still scrolls on GNOME
 with ordinary wheel events, which libinput makes hesitant at slow speeds.
 
 The extension's settings (the gear in the Extensions app, **Indicator
-style** in midscroll Settings, or `gnome-extensions prefs
+style** in Scroll Goblin Settings, or `gnome-extensions prefs
 midscroll-indicator@midscroll`) change what's drawn while you drag, per
 user and without a password:
 
@@ -155,13 +157,15 @@ Each change plays a short preview in the middle of the screen.
 
 ## Settings GUI
 
-Search your app menu for **midscroll Settings** (or run `midscroll-settings`)
-for a GTK window that changes every setting - speed, dead zone, event rate,
-natural scrolling, the ghost cursor, the app blacklist, click to scroll and the
-desktop/panels toggle - with sliders and switches. It also lists your input
-devices with a switch each, so you can add a device midscroll didn't
+Search your app menu for **Scroll Goblin Settings** (or run
+`midscroll-settings`) for a GTK window that changes every setting - speed,
+dead zone, event rate, natural scrolling, click to scroll, whether the
+cursor moves while scrolling, the ghost cursor, the app blacklist and the
+desktop/panels toggle - with sliders and switches. On GNOME its
+**Indicator style** button opens the extension's look settings. It also
+lists your input devices with a switch each, so you can add a device it didn't
 recognise as a mouse, or tell it to leave one alone. Clicking **Apply** asks
-for admin authorization (via pkexec, using midscroll's own polkit action, so
+for admin authorization (via pkexec, using its own polkit action, so
 the prompt is scoped to writing this one config file), writes
 `/etc/midscroll.conf` and restarts the daemon for you.
 
@@ -214,7 +218,7 @@ prints the device list and exits.
 
 ### Choosing which mice to use
 
-midscroll picks up anything that looks like a plain relative mouse. To use
+Scroll Goblin picks up anything that looks like a plain relative mouse. To use
 something it doesn't recognise - a trackball, a receiver's second
 interface, an odd HID collection - or to leave one of your mice alone, use
 the switches in the settings GUI, or the two config keys directly:
@@ -227,7 +231,7 @@ IGNORE_DEVICES = 046d:c548
 Each entry is a `/dev/input` path (the `by-id` and `by-path` links are the
 ones that survive a reboot), a hex `vendor:product`, or part of the device
 name. `IGNORE_DEVICES` wins over `EXTRA_DEVICES`. To see every device with
-its identifier and what midscroll does with it:
+its identifier and what Scroll Goblin does with it:
 
 ```
 sudo midscroll --list-devices
@@ -244,7 +248,7 @@ GUI deliberately cannot ([SECURITY.md](SECURITY.md) explains why).
 
 ## Pause / uninstall
 
-Apps in `BLACKLIST` pause midscroll automatically while focused. For
+Apps in `BLACKLIST` pause Scroll Goblin automatically while focused. For
 everything else:
 
 ```
@@ -294,7 +298,7 @@ sudo dnf remove midscroll         # or apt remove / pacman -R
   that copies the real mouse's name and vendor/product IDs, so libinput and
   KDE keep applying that mouse's own pointer-speed and acceleration
   settings. If a specific mouse still loses its speed after enabling
-  midscroll, set it once more in *System Settings -> Mouse* while midscroll
+  Scroll Goblin, set it once more in *System Settings -> Mouse* while it
   is running (KDE stores it per device in `kcminputrc`) and it will stick.
 - If Firefox's built-in autoscroll is enabled (`general.autoScroll` in
   about:config), turn it off so the two don't fight. It's off by default
@@ -306,7 +310,7 @@ sudo dnf remove midscroll         # or apt remove / pacman -R
 
 ## Security - please review the code yourself
 
-midscroll runs a background daemon that reads every mouse (and writes a
+Scroll Goblin runs a background daemon that reads every mouse (and writes a
 virtual one) at the kernel input layer. That is a lot of trust to hand a
 program you found online. **Don't take my word that it's safe - read it.**
 It's deliberately small and dependency-light so you can:
@@ -339,7 +343,7 @@ Copyright (C) 2026 G. Austin Servantes. Licensed under the
 share it, and anything you distribute that is built on it must be released
 under the same license with its source.
 
-Based on [gnhen/midscroll](https://github.com/gnhen/midscroll), released
+Scroll Goblin is based on [gnhen/midscroll](https://github.com/gnhen/midscroll), released
 into the public domain under the Unlicense. The badge icon is
 [move-vertical](https://lucide.dev/icons/move-vertical) from Lucide
 (ISC license).

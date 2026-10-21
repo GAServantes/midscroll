@@ -1,11 +1,11 @@
 name: Idea or feature request
-description: Suggest something midscroll could do
+description: Suggest something Scroll Goblin could do
 labels: [enhancement]
 body:
   - type: textarea
     id: idea
     attributes:
       label: What would you like?
-      description: What you're trying to do, and how midscroll could help.
+      description: What you're trying to do, and how Scroll Goblin could help.
     validations:
       required: true

@@ -1,7 +1,7 @@
 Name:           midscroll
-Version:        1.24
+Version:        1.25
 Release:        1%{?dist}
-Summary:        Windows-style middle-button drag autoscroll
+Summary:        Scroll Goblin, Windows-style middle-button autoscroll
 License:        GPL-3.0-or-later
 BuildArch:      noarch
 
@@ -132,6 +132,10 @@ fi
 %config(noreplace) %{_sysconfdir}/midscroll.conf
 
 %changelog
+* Tue Oct 20 2026 G. Austin Servantes - 1.25-1
+- Renamed Scroll Goblin where people see it (app menu, settings window,
+  GNOME extension, docs); the command, package, services, config file and
+  extension ID stay midscroll
 * Tue Oct 20 2026 G. Austin Servantes - 1.24-1
 - TOGGLE_MODE ("Click to scroll too") is on by default
 - GNOME: the extension draws no indicator by default; the ring, trail and

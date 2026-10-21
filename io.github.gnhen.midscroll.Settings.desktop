@@ -1,12 +1,12 @@
 [Desktop Entry]
 Type=Application
-Name=midscroll Settings
+Name=Scroll Goblin Settings
 GenericName=Autoscroll Settings
-Comment=Configure midscroll middle-drag autoscroll
+Comment=Configure Scroll Goblin middle-button autoscroll
 Exec=midscroll-settings
 Icon=midscroll
 Terminal=false
 Categories=Settings;HardwareSettings;
-Keywords=mouse;scroll;autoscroll;wheel;
+Keywords=mouse;scroll;autoscroll;wheel;midscroll;goblin;
 StartupNotify=true
 StartupWMClass=io.github.gnhen.midscroll.Settings

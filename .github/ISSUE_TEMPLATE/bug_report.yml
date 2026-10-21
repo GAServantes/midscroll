@@ -12,7 +12,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: midscroll version
+      label: Scroll Goblin version
       description: "`midscroll --version`"
     validations:
       required: true

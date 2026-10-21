@@ -1,10 +1,10 @@
 {
   "uuid": "midscroll-indicator@midscroll",
-  "name": "midscroll indicator",
-  "description": "Does the scrolling for the midscroll daemon as smooth pixel scroll, keeps the pointer inside the window being scrolled, and can draw an indicator at the drag anchor (off by default). Its look (style, color, size, opacity, speed readout) can be changed in the extension's settings.",
+  "name": "Scroll Goblin",
+  "description": "Does the scrolling for Scroll Goblin's midscroll daemon as smooth pixel scroll, keeps the pointer inside the window being scrolled, and can draw an indicator at the drag anchor (off by default). Its look (style, color, size, opacity, speed readout) can be changed in the extension's settings.",
   "shell-version": ["45", "46", "47", "48", "49", "50"],
   "session-modes": ["user", "unlock-dialog"],
   "settings-schema": "org.gnome.shell.extensions.midscroll",
-  "url": "https://github.com/GAServantes/midscroll",
-  "version": 10
+  "url": "https://github.com/GAServantes/scroll-goblin",
+  "version": 11
 }

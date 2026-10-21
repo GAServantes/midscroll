@@ -1,6 +1,6 @@
 # Security
 
-midscroll reads every mouse on the machine and writes a virtual one, as
+Scroll Goblin's daemon, `midscroll`, reads every mouse on the machine and writes a virtual one, as
 root, from boot. That is a lot of trust. This file says exactly what it
 trusts, what it refuses to do, and where the sharp edges are, so you can
 check the code against it rather than take anyone's word.

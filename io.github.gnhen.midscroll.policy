@@ -7,8 +7,8 @@
   <vendor_url>https://github.com/gnhen/midscroll</vendor_url>
 
   <action id="io.github.gnhen.midscroll.apply">
-    <description>Change midscroll autoscroll settings</description>
-    <message>Authentication is required to change midscroll settings</message>
+    <description>Change Scroll Goblin autoscroll settings</description>
+    <message>Authentication is required to change Scroll Goblin settings</message>
     <!-- Every Apply asks again. The credential cache auth_admin_keep gives
          would let anything else in your session re-run midscroll-apply
          unprompted for five minutes, and this action now decides which
