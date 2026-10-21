@@ -83,8 +83,9 @@ TICK_HZ = {TICK_HZ:g}              # scroll smoothness (event rate)
 NATURAL = {NATURAL}           # true = inverted / touchscreen-style direction
 
 # Windows style: a middle click (without dragging) also starts autoscroll,
-# and the next click stops it. Holding and dragging works either way; a
-# middle click no longer pastes or opens links in a new tab.
+# and the next click stops it. Holding and dragging works either way. On
+# GNOME, links and a browser's tabs and toolbars keep the middle click;
+# elsewhere a middle click no longer pastes.
 TOGGLE_MODE = {TOGGLE_MODE}
 
 # Autoscroll over the desktop and panels too. Off by default, so a middle-drag

@@ -25,6 +25,10 @@
 //     ring only, the older bars and badge, or nothing), its color, size,
 //     opacity and a speed readout are per-user settings (prefs.js);
 //     changing one plays a short preview mid-screen.
+//   - on "press", tells the daemon whether a plain middle click there
+//     should stay one ("click native": the app shows its link hand, or
+//     it's a browser's tabs and toolbars) or may start a click-to-scroll
+//     ("click scroll"), for TOGGLE_MODE.
 
 import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
@@ -70,6 +74,13 @@ const BOOL_CFG = new Set(['natural', 'free', 'ghost', 'snap']);
 // The ghost cursor: an arrow outline in 24 px cursor units, tip at 0,0.
 const GHOST_ARROW = [[0, 0], [0, 17], [4, 13], [7, 20], [10, 19], [7, 12], [12, 12]];
 const GHOST_SIZE = 24;
+// Cursor names a theme may give the link hand, and the plain arrow.
+const HAND_NAMES = ['pointer', 'hand2', 'pointing_hand', 'hand1', 'hand'];
+const ARROW_NAMES = ['default', 'left_ptr', 'arrow'];
+// Browsers keep tabs, toolbars and bookmarks along the top of the window,
+// where a middle click closes a tab or opens one, with the plain arrow.
+const BROWSERS = /brave|chrom|firefox|librewolf|vivaldi|opera|edge|zen|floorp|waterfox/i;
+const BROWSER_BAR = 120;
 
 function hueRgb(frac) {
     // 0 -> green (120deg), 1 -> red (0deg), via yellow/orange.
@@ -84,6 +95,67 @@ function hexRgb(hex) {
 
 function rgba([r, g, b], a) {
     return `rgba(${r}, ${g}, ${b}, ${a})`;
+}
+
+// The hot spot of each image in an Xcursor file, keyed "WxH", or null.
+function xcursorHots(path) {
+    let bytes;
+    try {
+        [, bytes] = GLib.file_get_contents(path);
+    } catch (e) {
+        return null;
+    }
+    const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    if (bytes.length < 16 || v.getUint32(0, true) !== 0x72756358)  // "Xcur"
+        return null;
+    const hots = {};
+    for (let i = 0, n = v.getUint32(12, true); i < n && 28 + i * 12 <= bytes.length; i++) {
+        const type = v.getUint32(16 + i * 12, true), pos = v.getUint32(24 + i * 12, true);
+        if (type !== 0xfffd0002 || pos + 36 > bytes.length)  // an image chunk
+            continue;
+        hots[`${v.getUint32(pos + 16, true)}x${v.getUint32(pos + 20, true)}`] ??=
+            [v.getUint32(pos + 24, true), v.getUint32(pos + 28, true)];
+    }
+    return hots;
+}
+
+// The hot spots of the first of `names` in a cursor theme or the themes it
+// inherits from.
+function findCursor(theme, names, seen = new Set()) {
+    if (seen.has(theme) || seen.size > 8)
+        return null;
+    seen.add(theme);
+    const dirs = [`${GLib.get_user_data_dir()}/icons`, `${GLib.get_home_dir()}/.icons`,
+        ...GLib.get_system_data_dirs().map(d => `${d}/icons`), '/usr/share/pixmaps'];
+    for (const dir of dirs) {
+        for (const name of names) {
+            const hots = xcursorHots(`${dir}/${theme}/cursors/${name}`);
+            if (hots)
+                return hots;
+        }
+    }
+    for (const dir of dirs) {
+        let inherits;
+        try {
+            const kf = new GLib.KeyFile();
+            kf.load_from_file(`${dir}/${theme}/index.theme`, GLib.KeyFileFlags.NONE);
+            inherits = kf.get_string('Icon Theme', 'Inherits');
+        } catch (e) {
+            continue;
+        }
+        for (const parent of inherits.split(',').map(t => t.trim()).filter(Boolean)) {
+            const hots = findCursor(parent, names, seen);
+            if (hots)
+                return hots;
+        }
+    }
+    return findCursor('default', names, seen);
+}
+
+function cursorTracker() {
+    // GNOME 47 moved the tracker from the display to the backend.
+    return global.backend.get_cursor_tracker?.() ??
+        Meta.CursorTracker.get_for_display(global.display);
 }
 
 function fmtSpeed(v) {
@@ -276,14 +348,46 @@ export default class MidscrollIndicator extends Extension {
         }
         this._iface = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
         this._readAccent();
+        this._readCursors();
         this._settingsIds.push([this._iface, this._iface.connect('changed', (s, key) => {
             if (key === 'accent-color' || key === 'gtk-theme') {
                 this._readAccent();
                 this._ringKey = this._trailKey = null;
             } else if (key === 'cursor-size') {
                 this._applyLook();
+            } else if (key === 'cursor-theme') {
+                this._readCursors();
             }
         })]);
+    }
+
+    _readCursors() {
+        const theme = this._iface.get_string('cursor-theme');
+        this._hands = findCursor(theme, HAND_NAMES);
+        this._arrows = findCursor(theme, ARROW_NAMES);
+    }
+
+    // A middle click here should stay a middle click (open a link in a new
+    // tab, close a tab, paste in the address bar) rather than start a
+    // click-to-scroll: over a browser's tabs and toolbars, or wherever the
+    // app shows its link hand. The hand is told from the arrow by its hot
+    // spot, read from the cursor theme for the size on screen.
+    _clickIsNative(py) {
+        const win = this._window;
+        if (win && BROWSERS.test(win.get_wm_class() ?? '') &&
+                py - win.get_frame_rect().y < BROWSER_BAR * this._theme)
+            return true;
+        const tracker = cursorTracker();
+        const sprite = tracker.get_sprite();
+        if (!sprite || !this._hands)
+            return false;
+        const size = `${sprite.get_width()}x${sprite.get_height()}`;
+        const hand = this._hands[size], arrow = this._arrows?.[size];
+        // A theme whose hand and arrow share a hot spot can't be told apart.
+        if (!hand || (arrow && arrow[0] === hand[0] && arrow[1] === hand[1]))
+            return false;
+        const [hx, hy] = tracker.get_hot();
+        return hx === hand[0] && hy === hand[1];
     }
 
     _readLook() {
@@ -568,9 +672,7 @@ export default class MidscrollIndicator extends Extension {
             return;
         const seat = Clutter.get_default_backend().get_default_seat();
         if (hide) {
-            // GNOME 47 moved the tracker from the display to the backend.
-            const tracker = global.backend.get_cursor_tracker?.() ??
-                Meta.CursorTracker.get_for_display(global.display);
+            const tracker = cursorTracker();
             seat.inhibit_unfocus();
             let id = 0;
             if (tracker.inhibit_cursor_visibility) {
@@ -777,6 +879,7 @@ export default class MidscrollIndicator extends Extension {
             const [px, py] = global.get_pointer();
             this._anchor = [px, py];
             this._window = this._windowAt(px, py);
+            this._send(`click ${this._clickIsNative(py) ? 'native' : 'scroll'}\n`);
             this._speed = [0, 0];
             this._pos = [0, 0];
             this._startPoll();

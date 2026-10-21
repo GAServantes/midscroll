@@ -13,7 +13,7 @@ import time
 
 from evdev import InputDevice, UInput, ecodes as e, list_devices
 
-VERSION = "1.22"
+VERSION = "1.23"
 
 log = logging.getLogger("midscroll")
 
@@ -370,6 +370,7 @@ class Notifier:
         self.screen_t = 0.0
         self.scrollers = set()  # writers whose helper scrolls by itself
         self.anchored = set()   # ... and can with the pointer held still
+        self.click_native = False  # helper: a click on this press stays one
 
     async def start(self):
         try:
@@ -428,6 +429,9 @@ class Notifier:
                     log.info("session helper (uid %s) does the scrolling", uid)
                 elif text == "caps anchored":
                     self.anchored.add(writer)
+                elif (text in ("click native", "click scroll")
+                      and uid in self.active_uids):
+                    self.click_native = text == "click native"
         except (OSError, ConnectionError, ValueError):
             pass  # ValueError: line over SOCK_LIMIT, drop the peer
         finally:
@@ -472,6 +476,10 @@ class Notifier:
             u for u in set(self.writers.values()) if _uid_is_active(u))
         if msg == b"press\n":
             self.screen = None
+            # The helper's say on this press, if it has one: whether a
+            # plain click here (a link, a browser's tab strip) should stay
+            # a middle click instead of starting a click-to-scroll.
+            self.click_native = False
         self._broadcast(msg, active_only=True)
 
     def speed(self, vx, vy):
@@ -914,7 +922,8 @@ async def pump(path, dev, states, tasks, focus, our_paths, notifier):
                     if st.passthrough:
                         st.passthrough = False
                         ui.write(e.EV_KEY, e.BTN_MIDDLE, 0)
-                    elif TOGGLE_MODE and st.is_click:
+                    elif (TOGGLE_MODE and st.is_click
+                          and not notifier.click_native):
                         # Windows style: a click starts autoscroll too, and
                         # the next click (any button) stops it.
                         st.begin_toggle()

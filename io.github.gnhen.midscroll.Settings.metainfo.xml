@@ -81,6 +81,15 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.23" date="2026-10-20">
+      <description>
+        <p>
+          On GNOME, with "Click to scroll too" on, a middle click on a link
+          or on a browser's tabs and toolbars still opens or closes tabs as
+          usual; a middle click anywhere else starts autoscroll.
+        </p>
+      </description>
+    </release>
     <release version="1.22" date="2026-10-20">
       <description>
         <p>

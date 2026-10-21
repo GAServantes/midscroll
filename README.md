@@ -35,10 +35,14 @@ Want clicking as well as holding, like Windows? Turn on **Click to scroll
 too** (in the settings GUI, or `TOGGLE_MODE = true`): a middle click
 without dragging then starts autoscroll, you move the mouse to set the
 speed, and the next click of any button stops it. Holding and dragging
-works the same as before. The catch is that a middle click no longer
-reaches your apps, so it won't paste or open a link in a new tab (browsers
-open one with Ctrl+click too). Windows browsers can tell a click on a link
-from a click on the page; midscroll sits below the apps and can't.
+works the same as before. On GNOME, a middle click still opens a link in a
+new tab: the extension checks whether the app is showing its link hand
+(the hand cursor's hot spot is read from your cursor theme, so it can't be
+mistaken for the arrow). A browser's tabs, toolbar and bookmarks bar (the
+top 120 px of the window) keep the middle click too, so it still closes or
+opens tabs there. Everywhere else, including text boxes, a middle click
+starts autoscroll instead of pasting. Without the extension (KDE, other
+desktops) every middle click starts autoscroll.
 
 It works in every app, on Wayland and X11, because it operates at the
 kernel input layer (evdev in, uinput out) instead of hooking any

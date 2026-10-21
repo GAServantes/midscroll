@@ -62,8 +62,9 @@ BOOLS = [
      "cursor follows your hand instead."),
     ("TOGGLE_MODE", "Click to scroll too",
      "Like Windows: a middle click starts autoscroll, and the next click "
-     "stops it. Holding and dragging still works. A middle click then no "
-     "longer pastes or opens a link in a new tab (Ctrl+click still does)."),
+     "stops it. Holding and dragging still works. On GNOME, a middle click "
+     "on a link or on a browser's tabs and toolbars still does its usual "
+     "thing; anywhere else it no longer pastes."),
     ("NATURAL", "Natural scrolling", "Invert the scroll direction."),
     ("GHOST_CURSOR", "Ghost cursor",
      "Only when the cursor is held still: draw a cursor that follows your "

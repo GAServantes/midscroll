@@ -1,5 +1,5 @@
 Name:           midscroll
-Version:        1.22
+Version:        1.23
 Release:        1%{?dist}
 Summary:        Windows-style middle-button drag autoscroll
 License:        GPL-3.0-or-later
@@ -132,6 +132,10 @@ fi
 %config(noreplace) %{_sysconfdir}/midscroll.conf
 
 %changelog
+* Tue Oct 20 2026 G. Austin Servantes - 1.23-1
+- GNOME, TOGGLE_MODE: a middle click on a link (the app shows its hand
+  cursor) or on a browser's tabs and toolbars stays a middle click, so it
+  still opens or closes tabs; elsewhere it starts autoscroll
 * Tue Oct 20 2026 G. Austin Servantes - 1.22-1
 - GNOME: with the pointer held still, the real cursor is hidden during the
   drag and the ghost cursor is the only one on screen; the ghost no longer
