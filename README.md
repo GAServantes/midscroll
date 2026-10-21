@@ -17,12 +17,12 @@ and the page scrolls faster the farther you move.
 > and GNOME 50 (Ubuntu 26.04). The GNOME work is also offered upstream as
 > [gnhen/midscroll#17](https://github.com/gnhen/midscroll/pull/17).
 
-![Hold the middle button and drag: the page scrolls faster the farther you go, with the anchor, a speed bar and a px/s readout drawn by the GNOME extension](screenshots/gnome-demo.gif)
+![Hold the middle button and drag: the page crawls, then speeds up, then scrolls back up when you drag above the press point](screenshots/gnome-demo.webp)
 
-<sub>Recorded in GNOME Shell 50 with the "Bars" style and speed colors: the
-bar turns from green to red as you drag farther; drag back past the anchor
-to scroll the other way. By default nothing is drawn; this look and a
-quieter ring with a fading line are in the extension's settings.</sub>
+<sub>Recorded at 25 fps in Brave on GNOME 46 (Ubuntu 24.04) with the optional
+*Ring and trail* style: a slow crawl, a faster scroll, then a drag back
+above the press point to scroll up. By default nothing is drawn; the
+styles are in the extension's settings.</sub>
 
 Hold the middle mouse button and drag. The page scrolls in that direction,
 faster the farther you drag from where you pressed, like Windows 10/11.
