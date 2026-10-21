@@ -1,7 +1,8 @@
 # Security
 
-Scroll Goblin's daemon, `midscroll`, reads every mouse on the machine and writes a virtual one, as
-root, from boot. That is a lot of trust. This file says exactly what it
+Scroll Goblin's daemon, `midscroll`, reads every mouse on the machine and
+writes a virtual one, as root, from boot. (Scroll Goblin is the project's
+name; the programs, services and files keep the name `midscroll`.) That is a lot of trust. This file says exactly what it
 trusts, what it refuses to do, and where the sharp edges are, so you can
 check the code against it rather than take anyone's word.
 
@@ -12,10 +13,11 @@ gap between the two, that is a bug worth reporting.
 
 | Component | Runs as | Trusts |
 | --- | --- | --- |
-| `midscroll` | root, `SCHED_FIFO`, sandboxed system unit | `/etc/midscroll.conf`, and only when root owns it and nobody else can write it. Nothing on its socket beyond short focus strings from a logged-in user |
+| `midscroll` | root, `SCHED_FIFO`, sandboxed system unit | `/etc/midscroll.conf`, and only when root owns it and nobody else can write it. On its socket, only short bounded lines from a logged-in user's helper (see "The state socket") |
 | `midscroll-apply` | root, briefly, via pkexec | its arguments, after validating every one. It can only ever write a well-formed `/etc/midscroll.conf` |
 | `midscroll-settings` | you | nothing privileged. Reads `/proc/bus/input/devices` and the config; hands validated `KEY=VALUE` pairs to `midscroll-apply` |
 | `midscroll-overlay` | you, session unit | the daemon's socket, after checking nobody it can name owns it (see below) |
+| GNOME extension (`midscroll-indicator@midscroll`) | you, inside GNOME Shell | the daemon's socket; your cursor theme's files, for hot spots only (see "The GNOME extension") |
 
 Two things this does *not* try to defend against, so they aren't mistaken
 for gaps: a hostile root (already game over), and hardware lying about
@@ -86,16 +88,30 @@ connection is then checked:
 - lines in are bounded (4 KiB read buffer, 256 characters kept, control
   characters stripped).
 
-What goes out: `1`/`0` when a drag starts and stops, and while an
+What comes in, and what each line can do:
+
+- `focus <class>`: the focused window's class, so the blacklist can pause
+  scrolling. The worst a lie can do is pause it or stop it pausing.
+- `caps scroll` / `caps anchored`: the helper scrolls by itself. The
+  daemon then stops sending wheel events for that session's drags.
+- `screen <dx> <dy>` (active session only): the on-screen drag offset,
+  used for the speed. Clamped like any drag offset.
+- `click native` / `click scroll` (active session only): whether a plain
+  middle click on this press should stay a middle click (a link, a
+  browser's tabs) or start a click-to-scroll. It can only choose between
+  those two.
+
+What goes out: `press`/`release` and `1`/`0` when a drag starts and
+stops; the speed curve (`cfg`) and the current speed; and while an
 anchored drag is running, `pos <dx> <dy>` - **offsets from the anchor,
-never absolute coordinates**, and only to the session that is currently
-active, so another user's backgrounded session sees nothing. A client
+never absolute coordinates**. Drag lines only go to the session that is
+currently active, so another user's backgrounded session sees nothing. A client
 that stops reading is skipped while it is behind and disconnected if it
 stays behind, so it can't grow a root daemon's memory at 60 Hz.
 
-## The full-screen overlay
+## The full-screen overlay (KDE)
 
-The ghost cursor is drawn on a layer-shell surface that covers the
+On KDE Plasma the ghost cursor is drawn on a layer-shell surface that covers the
 monitor, so its empty input region is the thing that must never be wrong:
 a surface that took input would swallow every click in the session. Three
 independent guards:
@@ -125,6 +141,34 @@ your own uid is the only one mapped, so root, like every other owner,
 reads back as the overflow uid. The real guarantee is one level up -
 `/run/midscroll` is a root-owned `RuntimeDirectory`, so nothing else can
 put a socket there in the first place.
+
+## The GNOME extension
+
+On GNOME a Shell extension does the scrolling and the drawing. It runs
+inside GNOME Shell as you, with what any extension has, so read
+`gnome-extension/extension.js` before installing it. What it does with
+that access:
+
+- It scrolls through its own virtual pointer, and only while the daemon
+  says a drag is on. It never clicks, types or moves the pointer, except
+  to put the pointer back where your hand is when a held-still drag ends.
+- With a free cursor it fences the pointer into the window the drag
+  started in with pointer barriers, removed on release, on a lost
+  connection and when the extension is turned off.
+- With the pointer held still it hides the real cursor and holds GNOME's
+  "keep pointer focus" inhibit for the length of the drag. Both are let go
+  on release, on a lost connection and when the extension is turned off,
+  so the cursor can't stay hidden.
+- To tell a link's hand cursor from the arrow, it reads the hot spot of
+  each image in your cursor theme's Xcursor files: files over 4 MiB are
+  skipped, every offset is bounds-checked against the file, and only
+  numbers are kept. It runs unprivileged and reads files you already own.
+- It stays on through the lock screen so GNOME never has to turn it back
+  on at unlock, but while the screen is locked it treats every window as
+  hidden, so a middle-drag there can't fence the pointer into a window
+  behind the lock screen.
+- Its look settings are ordinary per-user GSettings; changing them needs
+  no password and touches nothing system-wide.
 
 ## Sandboxing
 

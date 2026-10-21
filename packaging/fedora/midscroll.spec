@@ -1,5 +1,5 @@
 Name:           midscroll
-Version:        1.25
+Version:        1.26
 Release:        1%{?dist}
 Summary:        Scroll Goblin, Windows-style middle-button autoscroll
 License:        GPL-3.0-or-later
@@ -132,6 +132,10 @@ fi
 %config(noreplace) %{_sysconfdir}/midscroll.conf
 
 %changelog
+* Tue Oct 20 2026 G. Austin Servantes - 1.26-1
+- GNOME extension: skip cursor-theme files over 4 MiB when reading the
+  hand cursor's hot spot
+- SECURITY.md covers the GNOME extension and every state-socket line
 * Tue Oct 20 2026 G. Austin Servantes - 1.25-1
 - Renamed Scroll Goblin where people see it (app menu, settings window,
   GNOME extension, docs); the command, package, services, config file and

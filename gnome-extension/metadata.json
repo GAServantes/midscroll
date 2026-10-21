@@ -6,5 +6,5 @@
   "session-modes": ["user", "unlock-dialog"],
   "settings-schema": "org.gnome.shell.extensions.midscroll",
   "url": "https://github.com/GAServantes/scroll-goblin",
-  "version": 11
+  "version": 12
 }

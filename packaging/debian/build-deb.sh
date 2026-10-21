@@ -9,7 +9,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 repo=$(cd ../.. && pwd)
 
-version=1.25-1
+version=1.26-1
 maintainer=${DEB_MAINTAINER:-"midscroll maintainers <noreply@example.com>"}
 
 work=$(mktemp -d)

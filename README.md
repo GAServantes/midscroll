@@ -316,8 +316,9 @@ program you found online. **Don't take my word that it's safe - read it.**
 It's deliberately small and dependency-light so you can:
 
 - `midscroll` (the daemon) and `midscroll-overlay` (the session cursor and
-  focus helper) are single, commented Python files - skim them start to
-  finish.
+  focus helper on KDE) are single, commented Python files - skim them start
+  to finish. On GNOME the helper is a Shell extension,
+  `gnome-extension/extension.js`, also a single commented file.
 - `midscroll-apply` is the only thing that runs as root on demand (via
   pkexec from the settings GUI); it validates every value and only ever
   writes `/etc/midscroll.conf`.
@@ -330,8 +331,8 @@ It's deliberately small and dependency-light so you can:
 **[SECURITY.md](SECURITY.md)** goes through it properly: what each part
 trusts, why the config file must be root-owned, why keyboards can only be
 added by a root edit and never from the GUI, what the state socket does and
-doesn't hand out, and what keeps a full-screen overlay from ever eating
-your clicks.
+doesn't hand out, what keeps a full-screen overlay from ever eating
+your clicks, and what the GNOME extension does with its access.
 
 Found something sketchy or a way to harden it further? Open an issue or PR -
 security review is genuinely welcome.

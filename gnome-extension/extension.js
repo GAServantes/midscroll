@@ -81,6 +81,8 @@ const ARROW_NAMES = ['default', 'left_ptr', 'arrow'];
 // where a middle click closes a tab or opens one, with the plain arrow.
 const BROWSERS = /brave|chrom|firefox|librewolf|vivaldi|opera|edge|zen|floorp|waterfox/i;
 const BROWSER_BAR = 120;
+// A cursor file bigger than this is skipped, not read into the Shell.
+const MAX_XCURSOR_BYTES = 4 * 1024 * 1024;
 
 function hueRgb(frac) {
     // 0 -> green (120deg), 1 -> red (0deg), via yellow/orange.
@@ -101,6 +103,10 @@ function rgba([r, g, b], a) {
 function xcursorHots(path) {
     let bytes;
     try {
+        const info = Gio.File.new_for_path(path).query_info('standard::size',
+            Gio.FileQueryInfoFlags.NONE, null);
+        if (info.get_size() > MAX_XCURSOR_BYTES)
+            return null;
         [, bytes] = GLib.file_get_contents(path);
     } catch (e) {
         return null;
