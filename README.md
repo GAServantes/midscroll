@@ -20,8 +20,10 @@ Windows-style middle-button drag autoscroll for Linux.
 
 ![Hold the middle button and drag: the page scrolls faster the farther you go, with the anchor, a speed bar and a px/s readout drawn by the GNOME extension](screenshots/gnome-demo.gif)
 
-<sub>Recorded in GNOME Shell 50. The bar turns from green to red as you drag
-farther; drag back past the anchor to scroll the other way.</sub>
+<sub>Recorded in GNOME Shell 50 with the "Bars" style and speed colors: the
+bar turns from green to red as you drag farther; drag back past the anchor
+to scroll the other way. The default look is quieter: a small ring at the
+press point and a thin line fading in toward your hand.</sub>
 
 Hold the middle mouse button and drag. The page scrolls in that direction,
 faster the farther you drag from where you pressed, like Windows 10/11.
@@ -128,6 +130,21 @@ working, `journalctl -u midscroll -b | grep "does the scrolling"` should
 show the extension connecting. Without it, midscroll still scrolls on GNOME
 with ordinary wheel events, which libinput makes hesitant at slow speeds.
 
+The extension's settings (the gear in the Extensions app, **Indicator
+style** in midscroll Settings, or `gnome-extensions prefs
+midscroll-indicator@midscroll`) change what's drawn while you drag, per
+user and without a password:
+
+- **Style**: *Ring and trail* (the default: a small ring at the press
+  point that lights the arrows you're pulling toward, and a line fading in
+  toward your hand), *Ring only*, *Bars* (the older badge and colored bars)
+  or *Nothing*.
+- **Color**: the desktop's accent color, *Speed* (green to red as you go
+  faster) or white.
+- **Size**, **Opacity** and **Show speed** (a px/s readout by the pointer).
+
+Each change plays a short preview in the middle of the screen.
+
 ## Settings GUI
 
 Search your app menu for **midscroll Settings** (or run `midscroll-settings`)
@@ -230,7 +247,7 @@ sudo dnf remove midscroll         # or apt remove / pacman -R
 
 ## Notes
 
-- On GNOME the Shell extension draws the badge and ghost cursor. GNOME
+- On GNOME the Shell extension draws the indicator and ghost cursor. GNOME
   stops sending pointer events to apps while the pointer is hidden, so
   with `FREE_CURSOR = false` the real pointer stays visible at the anchor
   and the ghost is a drawn arrow. The ghost moves with your mouse's raw

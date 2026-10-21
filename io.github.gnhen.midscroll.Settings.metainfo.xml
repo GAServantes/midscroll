@@ -81,6 +81,16 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.21" date="2026-10-20">
+      <description>
+        <p>
+          On GNOME, a quieter look while you drag: a small ring where you
+          pressed and a line fading in toward your hand. The style, color,
+          size, opacity and a speed readout can be changed in the
+          extension's settings, with a live preview.
+        </p>
+      </description>
+    </release>
     <release version="1.20" date="2026-10-20">
       <description>
         <p>

@@ -21,14 +21,17 @@ jobs:
         run: |
           apt-get update
           apt-get install -y --no-install-recommends python3 shellcheck nodejs appstream \
-            desktop-file-utils dpkg-dev
+            desktop-file-utils dpkg-dev libglib2.0-bin
       - name: Lint
         run: |
           for f in *.py; do python3 -m py_compile "$f"; done
           shellcheck -S warning install.sh uninstall.sh \
             packaging/debian/build-deb.sh packaging/fedora/build-rpm.sh
-          cp gnome-extension/extension.js /tmp/extension.mjs
-          node --check /tmp/extension.mjs
+          for f in extension prefs; do
+            cp "gnome-extension/$f.js" "/tmp/$f.mjs"
+            node --check "/tmp/$f.mjs"
+          done
+          glib-compile-schemas --strict --dry-run gnome-extension/schemas
           appstreamcli validate --no-net io.github.gnhen.midscroll.Settings.metainfo.xml
           desktop-file-validate io.github.gnhen.midscroll.Settings.desktop
       - name: Build and install the .deb

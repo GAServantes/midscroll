@@ -18,7 +18,8 @@ cp "$repo"/midscroll.py "$repo"/midscroll-overlay.py "$repo"/midscroll.conf \
    "$repo"/systemd/midscroll.service "$repo"/systemd/midscroll-overlay.service \
    "$repo"/icons/move-vertical.svg \
    "$repo"/gnome-extension/extension.js "$repo"/gnome-extension/metadata.json \
-   "$repo"/gnome-extension/stylesheet.css "$work"/
+   "$repo"/gnome-extension/stylesheet.css "$repo"/gnome-extension/prefs.js \
+   "$repo"/gnome-extension/schemas/org.gnome.shell.extensions.midscroll.gschema.xml "$work"/
 
 mkdir -p "$repo/dist"
 rpmbuild -bb \

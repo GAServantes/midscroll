@@ -19,9 +19,12 @@
 //     barriers, so the scroll can't wander into another window. (Holding a
 //     button would do it without fences, but Mutter only keeps an implicit
 //     grab for buttons 1-5, so the daemon's lock button does nothing here.)
-//   - draws a badge at the anchor, a bar from the anchor to the pointer
-//     colored by distance (green at the anchor, red half a screen away)
-//     and a live speed readout.
+//   - draws an indicator while the drag scrolls: by default a small ring
+//     at the anchor that lights the arrows you're pulling toward, and a
+//     line fading in from the ring to the hand. The look (ring and trail,
+//     ring only, the older bars and badge, or nothing), its color, size,
+//     opacity and a speed readout are per-user settings (prefs.js);
+//     changing one plays a short preview mid-screen.
 
 import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
@@ -35,6 +38,24 @@ const SOCK_PATH = GLib.getenv('MIDSCROLL_SOCK') || '/run/midscroll/state.sock';
 const RECONNECT_S = 3;
 const BAR_WIDTH = 6;
 const ANCHOR_SIZE = 30;
+// The ring, in units at size 1 (scaled by the display and the size setting).
+const RING_SIZE = 28;
+const TRAIL_WIDTH = 3;
+const PREVIEW_US = 4e6;
+// Used until the settings load, or for good if their schema is missing.
+const LOOK_DEFAULTS = {style: 'ring-trail', color: 'accent', showSpeed: false, opacity: 0.85, size: 1};
+// libadwaita's accent colors (GNOME 47+), and Ubuntu's Yaru accents, which
+// GNOME 46 on Ubuntu names in the theme ("Yaru-blue-dark"; plain Yaru is
+// orange).
+const ACCENTS = {
+    blue: '#3584e4', teal: '#2190a4', green: '#3a944a', yellow: '#c88800', orange: '#ed5b00',
+    red: '#e62d42', pink: '#d56199', purple: '#9141ac', slate: '#6f8396',
+};
+const YARU_ACCENTS = {
+    '': '#e95420', bark: '#787859', sage: '#657b69', olive: '#4b8501', viridian: '#03875b',
+    prussiangreen: '#308280', blue: '#0073e5', purple: '#7764d8', magenta: '#b34cb3',
+    red: '#da3450',
+};
 // Fraction of the screen's height at which the bar turns fully red.
 const RED_AT_FRACTION = 0.5;
 // The finest scroll step that reaches apps unchanged: Mutter divides a
@@ -50,12 +71,19 @@ const BOOL_CFG = new Set(['natural', 'free', 'ghost', 'snap']);
 const GHOST_ARROW = [[0, 0], [0, 17], [4, 13], [7, 20], [10, 19], [7, 12], [12, 12]];
 const GHOST_SIZE = 24;
 
-function hueColor(frac) {
+function hueRgb(frac) {
     // 0 -> green (120deg), 1 -> red (0deg), via yellow/orange.
     const h = 120 * (1 - Math.min(Math.max(frac, 0), 1));
-    const c = 1, x = c * (1 - Math.abs(((h / 60) % 2) - 1));
-    let [r, g, b] = h < 60 ? [c, x, 0] : [x, c, 0];
-    return `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, 0.85)`;
+    const x = 1 - Math.abs(((h / 60) % 2) - 1);
+    return (h < 60 ? [1, x, 0] : [x, 1, 0]).map(v => Math.round(v * 255));
+}
+
+function hexRgb(hex) {
+    return [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+}
+
+function rgba([r, g, b], a) {
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
 }
 
 function fmtSpeed(v) {
@@ -81,6 +109,9 @@ export default class MidscrollIndicator extends Extension {
         this._lastTick = 0;
         this._carry = [0, 0];
         this._pos = [0, 0];
+        this._demo = null;
+        this._look = {...LOOK_DEFAULTS};
+        this._watchSettings();
         const seat = Clutter.get_default_backend().get_default_seat();
         this._vdev = seat.create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
         this._buildUi();
@@ -100,6 +131,11 @@ export default class MidscrollIndicator extends Extension {
         } catch (e) {}
         this._conn = this._out = null;
         this._vdev = null;
+        this._stopDemo();
+        for (const [obj, id] of this._settingsIds)
+            obj.disconnect(id);
+        this._settingsIds = [];
+        this._settings = this._iface = null;
         this._group?.destroy();
         this._group = null;
     }
@@ -173,8 +209,11 @@ export default class MidscrollIndicator extends Extension {
         return !this._cfg.free;
     }
 
-    // Where the hand is: the ghost when anchored, else the real pointer.
+    // Where the hand is: the ghost when anchored, else the real pointer
+    // (or the preview's made-up hand).
     _hand() {
+        if (this._demo)
+            return [this._anchor[0] + this._demo.hand[0], this._anchor[1] + this._demo.hand[1]];
         if (!this._anchored)
             return global.get_pointer();
         return [this._anchor[0] + this._pos[0], this._anchor[1] + this._pos[1]];
@@ -214,10 +253,67 @@ export default class MidscrollIndicator extends Extension {
             Clutter.ScrollSource.CONTINUOUS, Clutter.ScrollFinishFlags.NONE);
     }
 
+    // ---- look settings -------------------------------------------------------
+
+    // The look settings (prefs.js) and the desktop's accent color. A copy
+    // installed without its schemas/ just keeps the defaults.
+    _watchSettings() {
+        this._settingsIds = [];
+        try {
+            this._settings = this.getSettings();
+        } catch (e) {
+            this._settings = null;
+        }
+        if (this._settings) {
+            this._readLook();
+            this._settingsIds.push([this._settings, this._settings.connect('changed', () => {
+                this._readLook();
+                this._applyLook();
+                this._preview();
+            })]);
+        }
+        this._iface = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
+        this._readAccent();
+        this._settingsIds.push([this._iface, this._iface.connect('changed', (s, key) => {
+            if (key === 'accent-color' || key === 'gtk-theme') {
+                this._readAccent();
+                this._ringKey = this._trailKey = null;
+            }
+        })]);
+    }
+
+    _readLook() {
+        const s = this._settings;
+        this._look = {
+            style: s.get_string('style'), color: s.get_string('color'),
+            showSpeed: s.get_boolean('show-speed'),
+            opacity: s.get_double('opacity'), size: s.get_double('size'),
+        };
+    }
+
+    _readAccent() {
+        const iface = this._iface;
+        if (iface.settings_schema.has_key('accent-color')) {
+            this._accent = hexRgb(ACCENTS[iface.get_string('accent-color')] ?? ACCENTS.blue);
+            return;
+        }
+        const theme = iface.get_string('gtk-theme').replace(/-dark$/, '');
+        const yaru = theme === 'Yaru' ? '' : theme.startsWith('Yaru-') ? theme.slice(5) : null;
+        this._accent = hexRgb(YARU_ACCENTS[yaru] ?? ACCENTS.blue);
+    }
+
+    // The indicator's color, for a hand `frac` of the way to "fast".
+    _tint(frac) {
+        if (this._look.color === 'speed')
+            return hueRgb(Math.round(frac * 16) / 16);
+        return this._look.color === 'white' ? [255, 255, 255] : this._accent;
+    }
+
     // ---- UI ---------------------------------------------------------------
 
     _buildUi() {
         this._group = new Clutter.Actor({reactive: false, visible: false});
+        this._showGen = 0;
         this._vbar = new St.Widget({style_class: 'midscroll-bar', reactive: false});
         this._hbar = new St.Widget({style_class: 'midscroll-bar', reactive: false});
         this._badge = new St.BoxLayout({
@@ -235,6 +331,13 @@ export default class MidscrollIndicator extends Extension {
                 x_align: Clutter.ActorAlign.CENTER,
             }));
         }
+        this._badge.set_pivot_point(0.5, 0.5);
+        this._ring = new St.DrawingArea({reactive: false});
+        this._ring.set_pivot_point(0.5, 0.5);
+        this._ring.connect('repaint', area => this._paintRing(area));
+        // Rotated about its left end, which sits at the ring's edge.
+        this._trail = new St.Widget({reactive: false});
+        this._trail.set_pivot_point(0, 0.5);
         this._label = new St.Label({style_class: 'midscroll-label', reactive: false});
         const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
         this._ghost = new St.DrawingArea({
@@ -259,19 +362,62 @@ export default class MidscrollIndicator extends Extension {
             cr.stroke();
             cr.$dispose();
         });
-        for (const a of [this._vbar, this._hbar, this._badge, this._label, this._ghost])
+        for (const a of [this._trail, this._vbar, this._hbar, this._badge, this._ring,
+            this._label, this._ghost])
             this._group.add_child(a);
         Main.uiGroup.add_child(this._group);
+        this._applyLook();
+    }
+
+    // Sizes that follow the size setting and the display's scale.
+    _applyLook() {
+        if (!this._group)
+            return;
+        this._theme = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+        const {size, opacity} = this._look;
+        this._k = this._theme * size;
+        const ring = Math.round(RING_SIZE * this._k);
+        this._ring.set_size(ring, ring);
+        this._badge.set_scale(size, size);
+        this._label.set_style(`font-size: ${(10 * size).toFixed(1)}pt;`);
+        this._ringKey = this._trailKey = null;
+        if (this._group.visible && !this._group.get_transition('opacity'))
+            this._group.opacity = Math.round(255 * opacity);
     }
 
     _show(on) {
         if (!this._group)
             return;
+        const gen = ++this._showGen;
+        this._group.remove_all_transitions();
         if (on) {
             Main.uiGroup.set_child_above_sibling(this._group, null);
+            this._ringKey = this._trailKey = null;
             this._redraw();
+            if (!this._group.visible) {
+                this._group.opacity = 0;
+                this._group.visible = true;
+                // The ring pops in from half size.
+                this._ring.set_scale(0.5, 0.5);
+                this._ring.ease({
+                    scale_x: 1, scale_y: 1, duration: 180,
+                    mode: Clutter.AnimationMode.EASE_OUT_BACK,
+                });
+            }
+            this._group.ease({
+                opacity: Math.round(255 * this._look.opacity), duration: 120,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            });
+        } else if (this._group.visible) {
+            this._group.ease({
+                opacity: 0, duration: 160,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                onComplete: () => {
+                    if (gen === this._showGen && this._group)
+                        this._group.visible = false;
+                },
+            });
         }
-        this._group.visible = on;
     }
 
     _redraw() {
@@ -281,22 +427,12 @@ export default class MidscrollIndicator extends Extension {
         const [px, py] = this._hand();
         const dx = px - ax, dy = py - ay;
         const redAt = global.stage.height * RED_AT_FRACTION;
+        const {style} = this._look;
 
-        this._badge.set_position(ax - ANCHOR_SIZE / 2, ay - ANCHOR_SIZE / 2);
-
-        // Vertical bar: anchor -> pointer height, colored by distance.
-        this._vbar.visible = Math.abs(dy) > ANCHOR_SIZE / 2;
-        if (this._vbar.visible) {
-            this._vbar.set_position(ax - BAR_WIDTH / 2, Math.min(ay, py));
-            this._vbar.set_size(BAR_WIDTH, Math.abs(dy));
-            this._vbar.set_style(`background-color: ${hueColor(Math.abs(dy) / redAt)};`);
-        }
-        this._hbar.visible = Math.abs(dx) > ANCHOR_SIZE / 2;
-        if (this._hbar.visible) {
-            this._hbar.set_position(Math.min(ax, px), ay - BAR_WIDTH / 2);
-            this._hbar.set_size(Math.abs(dx), BAR_WIDTH);
-            this._hbar.set_style(`background-color: ${hueColor(Math.abs(dx) / redAt)};`);
-        }
+        this._drawClassic(style === 'classic', ax, ay, dx, dy, redAt);
+        const tint = this._tint(Math.hypot(dx, dy) / redAt);
+        this._drawRing(style === 'ring-trail' || style === 'ring', ax, ay, tint);
+        this._drawTrail(style === 'ring-trail', ax, ay, dx, dy, tint);
 
         const [vx, vy] = this._speed;
         const parts = [];
@@ -304,12 +440,156 @@ export default class MidscrollIndicator extends Extension {
             parts.push(`${vy > 0 ? '▼' : '▲'} ${fmtSpeed(vy)}`);
         if (vx)
             parts.push(`${vx > 0 ? '▶' : '◀'} ${fmtSpeed(vx)}`);
-        this._label.text = parts.length ? `${parts.join('  ')} px/s` : '·';
-        this._label.set_position(px + 22, py + 14);
+        this._label.visible = this._look.showSpeed && parts.length > 0;
+        this._label.text = `${parts.join('  ')} px/s`;
+        this._label.set_position(px + 22 * this._k, py + 14 * this._k);
         // Mutter stops sending pointer events to apps while the pointer is
-        // hidden, so the real one stays visible at the anchor.
-        this._ghost.visible = this._anchored && this._cfg.ghost;
+        // hidden, so the real one stays visible at the anchor. The preview
+        // draws one too, for the made-up hand.
+        this._ghost.visible = !!this._demo || (this._anchored && this._cfg.ghost);
         this._ghost.set_position(px - 1, py - 1);
+    }
+
+    // The older look: a badge at the anchor and a bar along each axis out
+    // to the hand.
+    _drawClassic(on, ax, ay, dx, dy, redAt) {
+        const w = BAR_WIDTH * this._look.size, gap = ANCHOR_SIZE * this._look.size / 2;
+        this._badge.visible = on;
+        this._vbar.visible = on && Math.abs(dy) > gap;
+        this._hbar.visible = on && Math.abs(dx) > gap;
+        if (!on)
+            return;
+        this._badge.set_position(ax - ANCHOR_SIZE / 2, ay - ANCHOR_SIZE / 2);
+        if (this._vbar.visible) {
+            this._vbar.set_position(ax - w / 2, Math.min(ay, ay + dy));
+            this._vbar.set_size(w, Math.abs(dy));
+            this._vbar.set_style(`background-color: ${rgba(this._tint(Math.abs(dy) / redAt), 0.85)};`);
+        }
+        if (this._hbar.visible) {
+            this._hbar.set_position(Math.min(ax, ax + dx), ay - w / 2);
+            this._hbar.set_size(Math.abs(dx), w);
+            this._hbar.set_style(`background-color: ${rgba(this._tint(Math.abs(dx) / redAt), 0.85)};`);
+        }
+    }
+
+    _drawRing(on, ax, ay, tint) {
+        this._ring.visible = on;
+        if (!on)
+            return;
+        const [w] = this._ring.get_size();
+        this._ring.set_position(Math.round(ax - w / 2), Math.round(ay - w / 2));
+        const [sx, sy] = this._speed.map(Math.sign);
+        // Repaint only when the lit arrows or the color change.
+        const key = `${sx} ${sy} ${tint}`;
+        if (key !== this._ringKey) {
+            this._ringKey = key;
+            this._ringLit = [sx, sy, tint];
+            this._ring.queue_repaint();
+        }
+    }
+
+    _paintRing(area) {
+        const cr = area.get_context();
+        const [w] = area.get_surface_size();
+        const k = w / RING_SIZE, c = w / 2, r = c - 1.5 * k;
+        const [sx, sy, [R, G, B]] = this._ringLit ?? [0, 0, [255, 255, 255]];
+        // A dark disc with a light rim, which takes the color once the
+        // scroll is moving.
+        cr.arc(c, c, r, 0, 2 * Math.PI);
+        cr.setSourceRGBA(0.08, 0.08, 0.1, 0.75);
+        cr.fillPreserve();
+        if (sx || sy)
+            cr.setSourceRGBA(R / 255, G / 255, B / 255, 0.95);
+        else
+            cr.setSourceRGBA(1, 1, 1, 0.85);
+        cr.setLineWidth(1.5 * k);
+        cr.stroke();
+        cr.arc(c, c, 1.5 * k, 0, 2 * Math.PI);
+        cr.setSourceRGBA(1, 1, 1, 0.9);
+        cr.fill();
+        // An arrow each way; the ones the hand is pulling toward light up.
+        const tip = 0.8 * r, base = 0.45 * r, half = 0.28 * r;
+        for (const [ux, uy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+            cr.moveTo(c + ux * tip, c + uy * tip);
+            cr.lineTo(c + ux * base - uy * half, c + uy * base + ux * half);
+            cr.lineTo(c + ux * base + uy * half, c + uy * base - ux * half);
+            cr.closePath();
+            if ((ux && ux === sx) || (uy && uy === sy))
+                cr.setSourceRGBA(R / 255, G / 255, B / 255, 1);
+            else
+                cr.setSourceRGBA(1, 1, 1, 0.45);
+            cr.fill();
+        }
+        cr.$dispose();
+    }
+
+    // A line from the ring's edge to the hand, fading in toward the hand.
+    _drawTrail(on, ax, ay, dx, dy, tint) {
+        const start = (RING_SIZE / 2 + 2) * this._k;
+        const len = Math.hypot(dx, dy) - start;
+        this._trail.visible = on && len > 4;
+        if (!this._trail.visible)
+            return;
+        const w = Math.max(2, Math.round(TRAIL_WIDTH * this._k));
+        const a = Math.atan2(dy, dx);
+        this._trail.set_size(len, w);
+        this._trail.set_position(ax + Math.cos(a) * start, ay + Math.sin(a) * start - w / 2);
+        this._trail.rotation_angle_z = a * 180 / Math.PI;
+        const key = `${tint} ${w}`;
+        if (key !== this._trailKey) {
+            this._trailKey = key;
+            // St scales CSS lengths by the display scale itself.
+            this._trail.set_style(`border-radius: ${w / 2 / this._theme}px; ` +
+                'background-gradient-direction: horizontal; ' +
+                `background-gradient-start: ${rgba(tint, 0)}; ` +
+                `background-gradient-end: ${rgba(tint, 0.95)};`);
+        }
+    }
+
+    // ---- preview -------------------------------------------------------------
+
+    // A few seconds of the indicator mid-screen, following a made-up hand,
+    // so a setting can be judged without dragging. Another change while it
+    // plays makes it play longer.
+    _preview() {
+        if (!this._group || (this._anchor && !this._demo))
+            return;
+        const now = GLib.get_monotonic_time();
+        if (this._demo) {
+            this._demo.end = now + PREVIEW_US;
+            return;
+        }
+        const g = global.display.get_monitor_geometry(global.display.get_current_monitor());
+        this._demo = {start: now, end: now + PREVIEW_US, hand: [0, 0], reach: g.height * 0.28};
+        this._anchor = [g.x + g.width / 2, g.y + g.height / 2];
+        this._speed = [0, 0];
+        this._active = true;
+        this._demoTimeline = new Clutter.Timeline({actor: global.stage, duration: 1000});
+        this._demoTimeline.set_repeat_count(-1);
+        this._demoTimeline.connect('new-frame', () => {
+            const t = GLib.get_monotonic_time();
+            if (t > this._demo.end) {
+                this._stopDemo();
+                return;
+            }
+            const s = (t - this._demo.start) / 1e6, reach = this._demo.reach;
+            this._demo.hand = [0.35 * reach * Math.sin(s * 1.9), reach * Math.sin(s * 1.3)];
+            this._speed = this._demo.hand.map(v => this._speedPx(v));
+            this._redraw();
+        });
+        this._demoTimeline.start();
+        this._show(true);
+    }
+
+    _stopDemo() {
+        if (!this._demo)
+            return;
+        this._demoTimeline?.stop();
+        this._demoTimeline = null;
+        this._demo = null;
+        this._anchor = null;
+        this._active = false;
+        this._show(false);
     }
 
     // ---- pointer sampling ------------------------------------------------
@@ -443,6 +723,7 @@ export default class MidscrollIndicator extends Extension {
 
     _onLine(line) {
         if (line === 'press') {
+            this._stopDemo();
             const [px, py] = global.get_pointer();
             this._anchor = [px, py];
             this._window = this._windowAt(px, py);

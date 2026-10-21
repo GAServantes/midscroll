@@ -12,10 +12,11 @@
   border-radius: 3px;
 }
 .midscroll-label {
-  font-size: 12pt;
+  font-size: 10pt;
   font-weight: bold;
-  color: white;
-  background-color: rgba(30, 30, 30, 0.85);
-  border-radius: 8px;
-  padding: 3px 9px;
+  font-feature-settings: "tnum";
+  color: rgba(255, 255, 255, 0.95);
+  background-color: rgba(20, 20, 24, 0.70);
+  border-radius: 99px;
+  padding: 2px 8px;
 }

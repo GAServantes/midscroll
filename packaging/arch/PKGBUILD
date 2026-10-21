@@ -1,5 +1,5 @@
 pkgname=midscroll
-pkgver=1.20
+pkgver=1.21
 pkgrel=1
 pkgdesc="Windows-style middle-button drag autoscroll (kernel-level, works on Wayland and X11)"
 arch=('any')
@@ -7,6 +7,7 @@ url="https://github.com/GAServantes/midscroll"
 license=('GPL-3.0-or-later')
 depends=('python' 'python-evdev' 'python-gobject' 'python-cairo' 'gtk4'
          'gtk4-layer-shell' 'librsvg' 'polkit')
+makedepends=('glib2')
 optdepends=('kdotool: autoscroll cursor and Wayland focus detection (AUR)'
             'xorg-xprop: focus detection on X11 (app blacklist)')
 install=midscroll.install
@@ -30,10 +31,13 @@ package() {
         "$pkgdir/usr/share/midscroll/move-vertical.svg"
     install -Dm644 icons/move-vertical.svg \
         "$pkgdir/usr/share/icons/hicolor/scalable/apps/midscroll.svg"
-    for f in extension.js metadata.json stylesheet.css; do
+    for f in extension.js prefs.js metadata.json stylesheet.css \
+             schemas/org.gnome.shell.extensions.midscroll.gschema.xml; do
         install -Dm644 "gnome-extension/$f" \
             "$pkgdir/usr/share/gnome-shell/extensions/midscroll-indicator@midscroll/$f"
     done
+    glib-compile-schemas --strict \
+        "$pkgdir/usr/share/gnome-shell/extensions/midscroll-indicator@midscroll/schemas"
     install -Dm644 midscroll.conf "$pkgdir/etc/midscroll.conf"
     install -Dm644 README.md "$pkgdir/usr/share/doc/midscroll/README.md"
     install -Dm644 SECURITY.md "$pkgdir/usr/share/doc/midscroll/SECURITY.md"

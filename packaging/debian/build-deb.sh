@@ -9,7 +9,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 repo=$(cd ../.. && pwd)
 
-version=1.20-1
+version=1.21-1
 maintainer=${DEB_MAINTAINER:-"midscroll maintainers <noreply@example.com>"}
 
 work=$(mktemp -d)
@@ -32,10 +32,14 @@ install -Dm644 "$repo/icons/move-vertical.svg" \
     "$stage/usr/share/midscroll/move-vertical.svg"
 install -Dm644 "$repo/icons/move-vertical.svg" \
     "$stage/usr/share/icons/hicolor/scalable/apps/midscroll.svg"
-for f in extension.js metadata.json stylesheet.css; do
+for f in extension.js prefs.js metadata.json stylesheet.css \
+         schemas/org.gnome.shell.extensions.midscroll.gschema.xml; do
     install -Dm644 "$repo/gnome-extension/$f" \
         "$stage/usr/share/gnome-shell/extensions/midscroll-indicator@midscroll/$f"
 done
+glib-compile-schemas --strict \
+    "$stage/usr/share/gnome-shell/extensions/midscroll-indicator@midscroll/schemas"
+chmod 644 "$stage/usr/share/gnome-shell/extensions/midscroll-indicator@midscroll/schemas/gschemas.compiled"
 install -Dm644 "$repo/midscroll.conf" "$stage/etc/midscroll.conf"
 install -Dm644 "$repo/README.md" "$stage/usr/share/doc/midscroll/README.md"
 install -Dm644 "$repo/SECURITY.md" "$stage/usr/share/doc/midscroll/SECURITY.md"

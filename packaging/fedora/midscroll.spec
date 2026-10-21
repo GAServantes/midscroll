@@ -1,5 +1,5 @@
 Name:           midscroll
-Version:        1.20
+Version:        1.21
 Release:        1%{?dist}
 Summary:        Windows-style middle-button drag autoscroll
 License:        GPL-3.0-or-later
@@ -22,6 +22,8 @@ Source13:       io.github.gnhen.midscroll.Settings.metainfo.xml
 Source14:       extension.js
 Source15:       metadata.json
 Source16:       stylesheet.css
+Source17:       prefs.js
+Source18:       org.gnome.shell.extensions.midscroll.gschema.xml
 
 Requires:       python3
 Requires:       python3-evdev
@@ -41,6 +43,8 @@ BuildRequires:  systemd-rpm-macros
 # Validating the software-center metadata (%%check)
 BuildRequires:  libappstream-glib
 BuildRequires:  desktop-file-utils
+# Compiles the extension's settings schema
+BuildRequires:  glib2
 
 %description
 Hold the middle mouse button and drag to scroll, with speed proportional
@@ -74,10 +78,14 @@ install -Dm644 %{SOURCE11} \
 install -Dm644 %{SOURCE13} \
     %{buildroot}%{_metainfodir}/io.github.gnhen.midscroll.Settings.metainfo.xml
 # GNOME Shell extension: does the scrolling on GNOME (see README.md)
-for f in %{SOURCE14} %{SOURCE15} %{SOURCE16}; do
+for f in %{SOURCE14} %{SOURCE15} %{SOURCE16} %{SOURCE17}; do
     install -Dm644 "$f" \
         %{buildroot}%{_datadir}/gnome-shell/extensions/midscroll-indicator@midscroll/$(basename "$f")
 done
+install -Dm644 %{SOURCE18} \
+    %{buildroot}%{_datadir}/gnome-shell/extensions/midscroll-indicator@midscroll/schemas/$(basename %{SOURCE18})
+glib-compile-schemas --strict \
+    %{buildroot}%{_datadir}/gnome-shell/extensions/midscroll-indicator@midscroll/schemas
 install -d %{buildroot}%{_userpresetdir}
 echo "enable midscroll-overlay.service" \
     > %{buildroot}%{_userpresetdir}/90-midscroll.preset
@@ -124,6 +132,10 @@ fi
 %config(noreplace) %{_sysconfdir}/midscroll.conf
 
 %changelog
+* Tue Oct 20 2026 G. Austin Servantes - 1.21-1
+- GNOME: a quieter default indicator (a small ring at the press point and a
+  line fading in toward the hand), with a settings page for its style,
+  color, size, opacity and speed readout and a live preview
 * Tue Oct 20 2026 G. Austin Servantes - 1.20-1
 - GNOME: FREE_CURSOR = false works with the Shell extension: smooth
   scrolling stays on the spot you pressed while a drawn ghost cursor

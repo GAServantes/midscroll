@@ -18,6 +18,7 @@ midscroll-apply through polkit.
 
 import os
 import re
+import shutil
 import struct
 import sys
 
@@ -30,6 +31,7 @@ CONFIG_PATH = "/etc/midscroll.conf"
 PROC_DEVICES = "/proc/bus/input/devices"
 DEV_DIR = "/dev/input"
 PHYS_MARKER = "midscroll"
+GNOME_EXTENSION = "midscroll-indicator@midscroll"
 
 # Kernel input codes (linux/input-event-codes.h), fixed ABI.
 BTN_MIDDLE = 0x112
@@ -302,6 +304,10 @@ class Window(Gtk.ApplicationWindow):
         box.set_margin_end(16)
         scroller.set_child(box)
 
+        if self._on_gnome():
+            box.append(self._heading("On-screen look"))
+            box.append(self._look_row())
+
         box.append(self._heading("Behavior"))
         for key, label, subtitle in BOOLS:
             box.append(self._bool_row(key, label, subtitle))
@@ -358,6 +364,40 @@ class Window(Gtk.ApplicationWindow):
             self.set_default_size(520, min(nat, avail))
         except Exception:
             pass  # sizing is best-effort; never block the window from opening
+
+    @staticmethod
+    def _on_gnome():
+        desktop = os.environ.get("XDG_CURRENT_DESKTOP", "")
+        return ("GNOME" in desktop.split(":")
+                and shutil.which("gnome-extensions") is not None)
+
+    def _look_row(self):
+        """Opens the GNOME extension's own settings, which hold the look.
+
+        They are per-user and need no password, unlike everything below.
+        """
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, hexpand=True)
+        col.append(Gtk.Label(label="Indicator style", xalign=0))
+        sub = Gtk.Label(
+            label="The style, color, size and opacity of what's drawn "
+                  "while you drag, with a live preview. Changes there "
+                  "apply right away.",
+            xalign=0, wrap=True)
+        sub.add_css_class("dim-label")
+        col.append(sub)
+        row.append(col)
+        button = Gtk.Button(label="Open...", valign=Gtk.Align.CENTER)
+        button.connect("clicked", self.on_look)
+        row.append(button)
+        return row
+
+    def on_look(self, _btn):
+        try:
+            Gio.Subprocess.new(["gnome-extensions", "prefs", GNOME_EXTENSION],
+                               Gio.SubprocessFlags.STDERR_SILENCE)
+        except GLib.Error as err:
+            self.set_status(f"Could not open the look settings: {err.message}")
 
     # ---- widget builders ----
     def _heading(self, text):

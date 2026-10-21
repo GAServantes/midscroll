@@ -25,9 +25,12 @@ install -Dm644 icons/move-vertical.svg \
     /usr/share/icons/hicolor/scalable/apps/midscroll.svg
 # GNOME Shell extension: does the scrolling on GNOME (see README.md)
 ext=midscroll-indicator@midscroll
-for f in extension.js metadata.json stylesheet.css; do
+for f in extension.js prefs.js metadata.json stylesheet.css \
+         schemas/org.gnome.shell.extensions.midscroll.gschema.xml; do
     install -Dm644 "gnome-extension/$f" "/usr/share/gnome-shell/extensions/$ext/$f"
 done
+# Its look settings; without them it still runs, with the default look.
+glib-compile-schemas "/usr/share/gnome-shell/extensions/$ext/schemas" || true
 # Don't clobber an existing tuned config
 [ -f /etc/midscroll.conf ] || install -Dm644 midscroll.conf /etc/midscroll.conf
 
