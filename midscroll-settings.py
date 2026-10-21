@@ -3,7 +3,7 @@
 """midscroll-settings - a small GTK4 GUI for midscroll's tunables.
 
 Reads the current /etc/midscroll.conf (world-readable), lets you change
-every setting - including toggle mode and which devices count as a mouse -
+every setting - including click to scroll and which devices count as a mouse -
 with sliders, switches and a text box, and writes it back through pkexec
 (midscroll-apply), restarting the daemon so the change takes effect
 immediately. No terminal or config editing required.
@@ -60,9 +60,10 @@ BOOLS = [
      "the pointer (moving over a browser's tabs scrolls the tabs). Off holds "
      "the pointer still so the scroll stays where you pressed, and a drawn "
      "cursor follows your hand instead."),
-    ("TOGGLE_MODE", "Toggle mode",
-     "Click the middle button to start autoscroll and again to stop, "
-     "instead of holding and dragging."),
+    ("TOGGLE_MODE", "Click to scroll too",
+     "Like Windows: a middle click starts autoscroll, and the next click "
+     "stops it. Holding and dragging still works. A middle click then no "
+     "longer pastes or opens a link in a new tab (Ctrl+click still does)."),
     ("NATURAL", "Natural scrolling", "Invert the scroll direction."),
     ("GHOST_CURSOR", "Ghost cursor",
      "Only when the cursor is held still: draw a cursor that follows your "

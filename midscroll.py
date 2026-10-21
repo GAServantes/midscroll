@@ -13,7 +13,7 @@ import time
 
 from evdev import InputDevice, UInput, ecodes as e, list_devices
 
-VERSION = "1.21"
+VERSION = "1.22"
 
 log = logging.getLogger("midscroll")
 
@@ -32,7 +32,8 @@ PX_PER_NOTCH = 55.0       # how many px one wheel notch scrolls in your apps
 MAX_DRAG_PX = 1200.0      # cap on effective drag distance (~screen height)
 TICK_HZ = 90.0            # scroll event rate (higher = smoother)
 NATURAL = False           # True inverts scroll direction
-TOGGLE_MODE = False       # True: click to start/stop instead of hold-and-drag
+TOGGLE_MODE = False       # True: a middle click also starts autoscroll
+                          # (Windows style); hold-and-drag works either way
 DESKTOP_SCROLL = False    # True: also autoscroll over the desktop and panels
 GHOST_CURSOR = True       # True: helper draws a cursor at the dragged point
 GHOST_SCALE = 1.0         # ghost travel per unit of mouse motion
@@ -556,9 +557,10 @@ class State:
             self.ui.syn()
         self.pending = False      # middle held, deadzone not yet exceeded
         self.active = False       # hold-drag scrolling
-        self.toggled = False      # toggle-mode scrolling (no button held)
+        self.toggled = False      # click-started scrolling (no button held)
         self.passthrough = False  # middle held over a blacklisted app
-        self.eat_release = None   # button whose release to swallow (toggle)
+        self.eat_release = None   # button whose release to swallow: the
+                                  # click that stopped a click-started scroll
         self.dx = 0.0             # cursor offset from the origin
         self.dy = 0.0
         self.max_off = 0.0        # farthest the drag got, per axis
@@ -577,9 +579,16 @@ class State:
         self.pending = True
 
     def begin_toggle(self):
-        """Start toggle-mode autoscroll, anchored at the current point."""
-        self.reset()
+        """Keep scrolling after a middle click, Windows style: from the
+        same press point (offset kept), until the next click."""
+        self.pending = False
+        self.active = False
         self.toggled = True
+
+    @property
+    def is_click(self):
+        """The press so far is a click: no drag past CLICK_SLOP_PX."""
+        return self.pending or (self.active and self.max_off <= CLICK_SLOP_PX)
 
     def release(self):
         """Return (was_click, dx, dy).
@@ -588,8 +597,7 @@ class State:
         cleared.  A plain middle-click (no drag) returns dx=0, dy=0. A
         drag that never got past CLICK_SLOP_PX is still a click.
         """
-        was_click = self.pending or (self.active
-                                     and self.max_off <= CLICK_SLOP_PX)
+        was_click = self.is_click
         dx, dy = self.dx, self.dy
         self.reset()
         return was_click, dx, dy
@@ -668,13 +676,13 @@ async def ticker(states, notifier, focus):
         notifier.set(any(st.scrolling for st in states.values()))
         if now - last_ghost >= 1.0 / GHOST_HZ:
             last_ghost = now
-            dragging = next((s for s in states.values() if s.active), None)
+            dragging = next((s for s in states.values()
+                             if s.active or s.toggled), None)
             if dragging is not None:
                 ox, oy = notifier.offset(dragging)
                 notifier.speed(speed_px(ox), speed_px(oy))
-                # Only an anchored drag has a ghost: with a free cursor or
-                # in toggle mode the real cursor moves, so there is nothing
-                # to stand in for it. A helper that scrolls by itself needs
+                # Only an anchored drag has a ghost: with a free cursor the
+                # real cursor moves, so there is nothing to stand in for it. A helper that scrolls by itself needs
                 # the offset either way: the pointer it would read holds still.
                 if not FREE_CURSOR and (GHOST_CURSOR or notifier.delegated):
                     notifier.pos(dragging.dx * GHOST_SCALE,
@@ -685,13 +693,15 @@ def tick(st, dt, focus, notifier):
         # A blacklisted app is focused. Never scroll, and stop anything
         # already running (focus changed mid-scroll) so it can't keep
         # scrolling under the blacklisted app.
+        if st.toggled:
+            notifier.event(b"release\n")  # no button release will come
         if st.scrolling or st.pending:
             st.reset()
         return
     ox, oy = notifier.offset(st)
     if st.pending or st.active:
         st.max_off = max(st.max_off, abs(ox), abs(oy))
-    if (not TOGGLE_MODE and st.pending
+    if (st.pending
             and (abs(ox) > DEADZONE_PX or abs(oy) > DEADZONE_PX)):
         st.pending = False
         st.active = True
@@ -701,7 +711,7 @@ def tick(st, dt, focus, notifier):
         log.debug("scroll started (%s)", "helper" if delegated else "wheel")
     if not st.scrolling:
         return
-    if st.active and notifier.delegated:
+    if st.scrolling and notifier.delegated:
         return  # the helper scrolls; see Notifier
     ui = st.ui
     s = 1 if NATURAL else -1
@@ -813,47 +823,43 @@ def phys_roundtrips():
         probe.close()
 
 
-def _toggle_key(ev, st, ui, focus):
-    """Handle a mouse-button event in toggle mode.
+def _end_scroll(st, ui, notifier):
+    """The middle button came up, or a click stopped a click-started
+    scroll: stop, tell the helper, and catch up the anchored cursor."""
+    was_click, dx, dy = st.release()
+    notifier.event(b"release\n")
+    if SNAP_CURSOR_ON_RELEASE and not FREE_CURSOR and not notifier.delegated:
+        # Catch the anchored cursor up to wherever the real mouse ended up,
+        # like Windows does. A helper that scrolls warps it there itself:
+        # these relative counts would be accelerated by the compositor.
+        sx, sy = int(dx), int(dy)
+        if sx or sy:
+            log.info("snap cursor: dx=%g dy=%g", sx, sy)
+            _snap_cursor(ui, sx, sy)
+    if was_click:
+        # No drag happened (never exceeded dead zone).
+        ui.write(e.EV_KEY, e.BTN_MIDDLE, 1)
+        ui.syn()
+        ui.write(e.EV_KEY, e.BTN_MIDDLE, 0)
+        ui.syn()
 
-    Windows-Explorer style: a middle click starts autoscroll, then any
-    click stops it. Returns True if the event was consumed (swallowed),
-    False if it should be forwarded like a normal button press.
+
+def _toggle_stop(ev, st, ui, notifier):
+    """While a click-started scroll runs, any click stops it.
+
+    The stopping click is swallowed, release and all, so it doesn't also
+    land in whatever is underneath. Returns True if the event was consumed.
     """
-    code = ev.code
-    # Finish swallowing the click that stopped autoscroll: eat its release
-    # so the app underneath never sees the stopping click.
-    if ev.value == 0 and st.eat_release == code:
+    if ev.value == 0 and st.eat_release == ev.code:
         st.eat_release = None
         return True
-    if st.toggled:
-        # Autoscroll is running: any button press stops it, consumed so the
-        # click doesn't also land in whatever is under the cursor.
-        if ev.value == 1:
-            log.debug("toggle scroll stopped")
-            st.reset()
-            st.eat_release = code
-        return True
-    # Idle: only the middle button starts autoscroll.
-    if code == e.BTN_MIDDLE:
-        if ev.value == 1:
-            if focus.blocked:
-                st.passthrough = True
-                ui.write(e.EV_KEY, e.BTN_MIDDLE, 1)
-                ui.syn()
-            else:
-                st.pending = True
-        elif ev.value == 0:
-            if st.passthrough:
-                st.passthrough = False
-                ui.write(e.EV_KEY, e.BTN_MIDDLE, 0)
-                ui.syn()
-            elif st.pending:
-                st.pending = False
-                st.begin_toggle()
-                log.debug("toggle scroll started")
-        return True
-    return False  # other buttons while idle pass straight through
+    if not st.toggled:
+        return False
+    if ev.value == 1:
+        log.debug("click scroll stopped")
+        _end_scroll(st, ui, notifier)
+        st.eat_release = ev.code
+    return True
 
 
 async def pump(path, dev, states, tasks, focus, our_paths, notifier):
@@ -889,11 +895,10 @@ async def pump(path, dev, states, tasks, focus, our_paths, notifier):
     log.info("grabbed %s (%s)", dev.name, path)
     try:
         async for ev in dev.async_read_loop():
-            if TOGGLE_MODE and ev.type == e.EV_KEY and _is_button(ev.code):
-                if _toggle_key(ev, st, ui, focus):
-                    continue
-                # An unrelated button while idle: fall through and forward it.
-            elif ev.type == e.EV_KEY and ev.code == e.BTN_MIDDLE:
+            if (ev.type == e.EV_KEY and _is_button(ev.code)
+                    and _toggle_stop(ev, st, ui, notifier)):
+                continue
+            if ev.type == e.EV_KEY and ev.code == e.BTN_MIDDLE:
                 if ev.value == 1:
                     if focus.blocked:
                         # A blacklisted app owns middle-drag; pass the
@@ -909,41 +914,26 @@ async def pump(path, dev, states, tasks, focus, our_paths, notifier):
                     if st.passthrough:
                         st.passthrough = False
                         ui.write(e.EV_KEY, e.BTN_MIDDLE, 0)
-                    else:
-                        was_click, dx, dy = st.release()
-                        notifier.event(b"release\n")
-                        if (SNAP_CURSOR_ON_RELEASE and not FREE_CURSOR
+                    elif TOGGLE_MODE and st.is_click:
+                        # Windows style: a click starts autoscroll too, and
+                        # the next click (any button) stops it.
+                        st.begin_toggle()
+                        if (FREE_CURSOR and LOCK_WINDOW
                                 and not notifier.delegated):
-                            # Catch the anchored cursor up to wherever the real
-                            # mouse ended up, like Windows does. A helper that
-                            # scrolls warps it there itself: these relative
-                            # counts would be accelerated by the compositor.
-                            sx, sy = int(dx), int(dy)
-                            if sx or sy:
-                                log.info("snap cursor: dx=%g dy=%g", sx, sy)
-                                _snap_cursor(ui, sx, sy)
-                        if was_click:
-                            # No drag happened (never exceeded dead zone).
-                            ui.write(e.EV_KEY, e.BTN_MIDDLE, 1)
-                            ui.syn()
-                            ui.write(e.EV_KEY, e.BTN_MIDDLE, 0)
-                            ui.syn()
+                            st.lock()
+                        log.debug("click scroll started")
+                    else:
+                        _end_scroll(st, ui, notifier)
                 continue
             if ev.type == e.EV_REL and ev.code in (e.REL_X, e.REL_Y):
-                if st.toggled:
-                    # Toggle mode: track distance from the origin but let the
-                    # motion through, so the cursor follows the hand like
-                    # Windows autoscroll.
-                    _accumulate(st, ev)
-                    ui.write(ev.type, ev.code, ev.value)
-                    continue
-                if (st.pending or st.active) and FREE_CURSOR:
+                dragging = st.pending or st.active or st.toggled
+                if dragging and FREE_CURSOR:
                     # Hold-drag, Windows-style: the pointer keeps moving and
                     # the offset from the press point sets the speed.
                     _accumulate(st, ev)
                     ui.write(ev.type, ev.code, ev.value)
                     continue
-                if st.pending or st.active:
+                if dragging:
                     # Hold-drag: swallow cursor motion so the pointer stays
                     # anchored at the press point. Scroll events then keep
                     # hitting the original window instead of whatever the
@@ -973,6 +963,8 @@ async def pump(path, dev, states, tasks, focus, our_paths, notifier):
             if st.passthrough:
                 ui.write(e.EV_KEY, e.BTN_MIDDLE, 0)
             ui.syn()
+        if st.pending or st.active or st.toggled:
+            notifier.event(b"release\n")
         st.reset()
         if mirror_path:
             our_paths.discard(mirror_path)
@@ -1227,8 +1219,9 @@ def parse_args(argv=None):
                    default=None, help="invert the scroll direction")
     p.add_argument("--toggle-mode", action=argparse.BooleanOptionalAction,
                    default=None, dest="toggle_mode",
-                   help="click to start/stop autoscroll (Windows-Explorer "
-                        "style) instead of hold-and-drag")
+                   help="a middle click also starts autoscroll, and the "
+                        "next click stops it (Windows style); hold-and-drag "
+                        "works either way")
     p.add_argument("--desktop", action=argparse.BooleanOptionalAction,
                    default=None, dest="desktop_scroll",
                    help="also autoscroll over the desktop and panels "

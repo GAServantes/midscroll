@@ -82,8 +82,9 @@ MAX_DRAG_PX = {MAX_DRAG_PX:g}        # max effective drag distance
 TICK_HZ = {TICK_HZ:g}              # scroll smoothness (event rate)
 NATURAL = {NATURAL}           # true = inverted / touchscreen-style direction
 
-# Click the middle button once to start autoscroll and again (or any click)
-# to stop, Windows-Explorer style, instead of holding it and dragging.
+# Windows style: a middle click (without dragging) also starts autoscroll,
+# and the next click stops it. Holding and dragging works either way; a
+# middle click no longer pastes or opens links in a new tab.
 TOGGLE_MODE = {TOGGLE_MODE}
 
 # Autoscroll over the desktop and panels too. Off by default, so a middle-drag

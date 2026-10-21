@@ -136,8 +136,10 @@ export default class MidscrollIndicator extends Extension {
             obj.disconnect(id);
         this._settingsIds = [];
         this._settings = this._iface = null;
+        this._hideCursor(false);
         this._group?.destroy();
-        this._group = null;
+        this._ghost?.destroy();
+        this._group = this._ghost = null;
     }
 
     // ---- speed and scrolling -----------------------------------------------
@@ -278,6 +280,8 @@ export default class MidscrollIndicator extends Extension {
             if (key === 'accent-color' || key === 'gtk-theme') {
                 this._readAccent();
                 this._ringKey = this._trailKey = null;
+            } else if (key === 'cursor-size') {
+                this._applyLook();
             }
         })]);
     }
@@ -312,7 +316,13 @@ export default class MidscrollIndicator extends Extension {
     // ---- UI ---------------------------------------------------------------
 
     _buildUi() {
+        // _group fades in and out; _indicator inside it carries the opacity
+        // setting. The ghost cursor stays apart from both: it stands in
+        // for the real pointer, so it is never see-through and appears and
+        // goes in step with it.
         this._group = new Clutter.Actor({reactive: false, visible: false});
+        this._indicator = new Clutter.Actor({reactive: false});
+        this._group.add_child(this._indicator);
         this._showGen = 0;
         this._vbar = new St.Widget({style_class: 'midscroll-bar', reactive: false});
         this._hbar = new St.Widget({style_class: 'midscroll-bar', reactive: false});
@@ -339,11 +349,7 @@ export default class MidscrollIndicator extends Extension {
         this._trail = new St.Widget({reactive: false});
         this._trail.set_pivot_point(0, 0.5);
         this._label = new St.Label({style_class: 'midscroll-label', reactive: false});
-        const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
-        this._ghost = new St.DrawingArea({
-            reactive: false, visible: false,
-            width: GHOST_SIZE * scale, height: GHOST_SIZE * scale,
-        });
+        this._ghost = new St.DrawingArea({reactive: false, visible: false});
         this._ghost.connect('repaint', area => {
             const cr = area.get_context();
             const k = area.width / GHOST_SIZE;
@@ -362,10 +368,10 @@ export default class MidscrollIndicator extends Extension {
             cr.stroke();
             cr.$dispose();
         });
-        for (const a of [this._trail, this._vbar, this._hbar, this._badge, this._ring,
-            this._label, this._ghost])
-            this._group.add_child(a);
+        for (const a of [this._trail, this._vbar, this._hbar, this._badge, this._ring, this._label])
+            this._indicator.add_child(a);
         Main.uiGroup.add_child(this._group);
+        Main.uiGroup.add_child(this._ghost);
         this._applyLook();
     }
 
@@ -381,8 +387,10 @@ export default class MidscrollIndicator extends Extension {
         this._badge.set_scale(size, size);
         this._label.set_style(`font-size: ${(10 * size).toFixed(1)}pt;`);
         this._ringKey = this._trailKey = null;
-        if (this._group.visible && !this._group.get_transition('opacity'))
-            this._group.opacity = Math.round(255 * opacity);
+        this._indicator.opacity = Math.round(255 * opacity);
+        // The ghost matches the real pointer's size.
+        const ghost = Math.round((this._iface?.get_int('cursor-size') || GHOST_SIZE) * this._theme);
+        this._ghost.set_size(ghost, ghost);
     }
 
     _show(on) {
@@ -392,6 +400,7 @@ export default class MidscrollIndicator extends Extension {
         this._group.remove_all_transitions();
         if (on) {
             Main.uiGroup.set_child_above_sibling(this._group, null);
+            Main.uiGroup.set_child_above_sibling(this._ghost, null);
             this._ringKey = this._trailKey = null;
             this._redraw();
             if (!this._group.visible) {
@@ -405,10 +414,13 @@ export default class MidscrollIndicator extends Extension {
                 });
             }
             this._group.ease({
-                opacity: Math.round(255 * this._look.opacity), duration: 120,
+                opacity: 255, duration: 120,
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             });
-        } else if (this._group.visible) {
+            return;
+        }
+        this._ghost.visible = false;
+        if (this._group.visible) {
             this._group.ease({
                 opacity: 0, duration: 160,
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
@@ -443,9 +455,7 @@ export default class MidscrollIndicator extends Extension {
         this._label.visible = this._look.showSpeed && parts.length > 0;
         this._label.text = `${parts.join('  ')} px/s`;
         this._label.set_position(px + 22 * this._k, py + 14 * this._k);
-        // Mutter stops sending pointer events to apps while the pointer is
-        // hidden, so the real one stays visible at the anchor. The preview
-        // draws one too, for the made-up hand.
+        // The preview draws one too, for the made-up hand.
         this._ghost.visible = !!this._demo || (this._anchored && this._cfg.ghost);
         this._ghost.set_position(px - 1, py - 1);
     }
@@ -543,6 +553,46 @@ export default class MidscrollIndicator extends Extension {
                 'background-gradient-direction: horizontal; ' +
                 `background-gradient-start: ${rgba(tint, 0)}; ` +
                 `background-gradient-end: ${rgba(tint, 0.95)};`);
+        }
+    }
+
+    // While the pointer is held still the ghost is the cursor, so the real
+    // one is hidden. Mutter takes the pointer's focus away from apps while
+    // it is hidden (the touchscreen rule), unless something inhibits that,
+    // so hold an inhibit for as long: the scrolls must keep reaching the
+    // app. GNOME 49 hides it with a counted inhibit; before that, each
+    // scroll makes Mutter show the pointer again, so it is hidden again
+    // straight away, before anything is drawn.
+    _hideCursor(hide) {
+        if (hide === !!this._cursorHidden)
+            return;
+        const seat = Clutter.get_default_backend().get_default_seat();
+        if (hide) {
+            // GNOME 47 moved the tracker from the display to the backend.
+            const tracker = global.backend.get_cursor_tracker?.() ??
+                Meta.CursorTracker.get_for_display(global.display);
+            seat.inhibit_unfocus();
+            let id = 0;
+            if (tracker.inhibit_cursor_visibility) {
+                tracker.inhibit_cursor_visibility();
+            } else {
+                tracker.set_pointer_visible(false);
+                id = tracker.connect('visibility-changed', () => {
+                    if (tracker.get_pointer_visible())
+                        tracker.set_pointer_visible(false);
+                });
+            }
+            this._cursorHidden = {tracker, id};
+        } else {
+            const {tracker, id} = this._cursorHidden;
+            this._cursorHidden = null;
+            if (id) {
+                tracker.disconnect(id);
+                tracker.set_pointer_visible(true);
+            } else {
+                tracker.uninhibit_cursor_visibility();
+            }
+            seat.uninhibit_unfocus();
         }
     }
 
@@ -737,6 +787,7 @@ export default class MidscrollIndicator extends Extension {
                 const [hx, hy] = this._hand();
                 Clutter.get_default_backend().get_default_seat().warp_pointer(hx, hy);
             }
+            this._hideCursor(false);
             this._anchor = null;
             this._window = null;
             this._active = false;
@@ -748,8 +799,10 @@ export default class MidscrollIndicator extends Extension {
             if (!this._anchored && this._window)
                 this._fence(this._window);
             this._show(true);
+            this._hideCursor(this._anchored && this._cfg.ghost);
         } else if (line === '0') {
             this._active = false;
+            this._hideCursor(false);
             this._unfence();
             this._show(false);
         } else if (line.startsWith('pos ')) {

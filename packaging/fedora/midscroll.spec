@@ -1,5 +1,5 @@
 Name:           midscroll
-Version:        1.21
+Version:        1.22
 Release:        1%{?dist}
 Summary:        Windows-style middle-button drag autoscroll
 License:        GPL-3.0-or-later
@@ -132,6 +132,13 @@ fi
 %config(noreplace) %{_sysconfdir}/midscroll.conf
 
 %changelog
+* Tue Oct 20 2026 G. Austin Servantes - 1.22-1
+- GNOME: with the pointer held still, the real cursor is hidden during the
+  drag and the ghost cursor is the only one on screen; the ghost no longer
+  takes the indicator's opacity
+- TOGGLE_MODE is now Windows style: a middle click also starts autoscroll
+  (and the next click stops it) while hold-and-drag keeps working, with
+  the same indicator, smooth scrolling and held pointer as a drag
 * Tue Oct 20 2026 G. Austin Servantes - 1.21-1
 - GNOME: a quieter default indicator (a small ring at the press point and a
   line fading in toward the hand), with a settings page for its style,

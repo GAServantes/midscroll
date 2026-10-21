@@ -32,8 +32,8 @@
       Windows autoscroll, so short drags crawl and long drags fly.</li>
       <li>The cursor stays anchored at the press point while scrolling, so
       the scroll stays locked to the window you started in.</li>
-      <li>A toggle mode for the Windows Explorer and Firefox style: one
-      click starts autoscroll, any click stops it.</li>
+      <li>Optionally, like Windows, a middle click starts autoscroll too,
+      and the next click stops it.</li>
       <li>An app blacklist that pauses midscroll over programs with their
       own middle-drag, such as FreeCAD, OrcaSlicer and Minecraft.</li>
       <li>A settings window for speed, dead zone, event rate, natural
@@ -81,6 +81,17 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.22" date="2026-10-20">
+      <description>
+        <p>
+          On GNOME, when the cursor is held still, the real cursor is now
+          hidden while you drag, so the drawn one following your hand is
+          the only one on screen. "Click to scroll too" (formerly toggle
+          mode) now works like Windows: a middle click starts autoscroll
+          and the next click stops it, and holding and dragging still works.
+        </p>
+      </description>
+    </release>
     <release version="1.21" date="2026-10-20">
       <description>
         <p>

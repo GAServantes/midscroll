@@ -31,10 +31,14 @@ Release to stop. A quick middle click without dragging still works as a
 normal middle click (paste, open link in new tab). Diagonal drags scroll
 both axes, so it pans wide pages too.
 
-Prefer clicking to holding? Turn on **toggle mode** (in the settings GUI or
-`TOGGLE_MODE = true`) for the Windows-Explorer / Firefox style instead: one
-middle click starts autoscroll, the cursor moves freely, and any click
-stops it.
+Want clicking as well as holding, like Windows? Turn on **Click to scroll
+too** (in the settings GUI, or `TOGGLE_MODE = true`): a middle click
+without dragging then starts autoscroll, you move the mouse to set the
+speed, and the next click of any button stops it. Holding and dragging
+works the same as before. The catch is that a middle click no longer
+reaches your apps, so it won't paste or open a link in a new tab (browsers
+open one with Ctrl+click too). Windows browsers can tell a click on a link
+from a click on the page; midscroll sits below the apps and can't.
 
 It works in every app, on Wayland and X11, because it operates at the
 kernel input layer (evdev in, uinput out) instead of hooking any
@@ -149,7 +153,7 @@ Each change plays a short preview in the middle of the screen.
 
 Search your app menu for **midscroll Settings** (or run `midscroll-settings`)
 for a GTK window that changes every setting - speed, dead zone, event rate,
-natural scrolling, the ghost cursor, the app blacklist, toggle mode and the
+natural scrolling, the ghost cursor, the app blacklist, click to scroll and the
 desktop/panels toggle - with sliders and switches. It also lists your input
 devices with a switch each, so you can add a device midscroll didn't
 recognise as a mouse, or tell it to leave one alone. Clicking **Apply** asks
@@ -169,7 +173,7 @@ SPEED_EXP = 2.2           # curve shape (bigger = more extreme at long drags)
 PX_PER_NOTCH = 55         # px one wheel notch scrolls in your apps
 TICK_HZ = 90              # scroll event rate (higher = smoother)
 NATURAL = false           # true = inverted / touchscreen-style direction
-TOGGLE_MODE = false       # true = click to start/stop instead of hold-drag
+TOGGLE_MODE = false       # true = a middle click also starts autoscroll
 DESKTOP_SCROLL = false    # true = also autoscroll over the desktop and panels
 FREE_CURSOR = true        # pointer follows your hand (false = anchored)
 GHOST_CURSOR = true       # anchored only: draw a cursor that follows your hand
@@ -247,11 +251,14 @@ sudo dnf remove midscroll         # or apt remove / pacman -R
 
 ## Notes
 
-- On GNOME the Shell extension draws the indicator and ghost cursor. GNOME
-  stops sending pointer events to apps while the pointer is hidden, so
-  with `FREE_CURSOR = false` the real pointer stays visible at the anchor
-  and the ghost is a drawn arrow. The ghost moves with your mouse's raw
-  counts, without GNOME's pointer acceleration; `GHOST_SCALE` tunes it.
+- On GNOME the Shell extension draws the indicator and ghost cursor. With
+  `FREE_CURSOR = false` it hides the real pointer while you drag, so the
+  ghost (a drawn arrow, at your cursor size and always fully opaque) is
+  the only cursor on screen. Mutter takes the pointer's focus away from
+  apps while it is hidden unless something inhibits that, so the extension
+  holds an inhibit for the length of the drag and the scroll keeps reaching
+  the app. The ghost moves with your mouse's raw counts, without GNOME's
+  pointer acceleration; `GHOST_SCALE` tunes it.
 - On KDE the badge and ghost cursor come from `midscroll-overlay`: the
   anchor position comes from kdotool, which uses KWin's scripting API, and
   they are drawn via wlr-layer-shell. On other desktops the daemon still
